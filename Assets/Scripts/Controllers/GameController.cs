@@ -1336,27 +1336,41 @@ public class GameController : MonoBehaviour
 
     private void ConfigureOnlinePlayerPanelLayout()
     {
-        if (!isOnlineMatchMode || GetConfiguredOnlinePlayerCount() != 2 || players == null || players.Length < 2 || players[0] == null || players[1] == null)
+        if (!isOnlineMatchMode || players == null || players.Length == 0)
         {
             return;
         }
 
         CapturePlayerPanelLayoutsIfNeeded();
-
-        int localSeat = GetResolvedLocalPlayerSlotIndex();
-        ApplyPlayerPanelLayout(players[0], capturedPlayerPanelLayouts[localSeat == 0 ? 0 : 1]);
-        ApplyPlayerPanelLayout(players[1], capturedPlayerPanelLayouts[localSeat == 0 ? 1 : 0]);
-    }
-
-    private void CapturePlayerPanelLayoutsIfNeeded()
-    {
-        if (playerPanelLayoutsCaptured || players == null || players.Length < 2)
+        if (capturedPlayerPanelLayouts == null || capturedPlayerPanelLayouts.Length == 0)
         {
             return;
         }
 
-        capturedPlayerPanelLayouts = new PlayerPanelLayout[2];
-        for (int i = 0; i < 2; i++)
+        int localSeat = GetResolvedLocalPlayerSlotIndex();
+        int layoutCount = Mathf.Min(activePlayerCount, Mathf.Min(players.Length, capturedPlayerPanelLayouts.Length));
+
+        for (int seatIndex = 0; seatIndex < layoutCount; seatIndex++)
+        {
+            if (players[seatIndex] == null)
+            {
+                continue;
+            }
+
+            int rotatedLayoutIndex = GetRotatedLayoutIndex(seatIndex, localSeat, layoutCount);
+            ApplyPlayerPanelLayout(players[seatIndex], capturedPlayerPanelLayouts[rotatedLayoutIndex]);
+        }
+    }
+
+    private void CapturePlayerPanelLayoutsIfNeeded()
+    {
+        if (playerPanelLayoutsCaptured || players == null || players.Length == 0)
+        {
+            return;
+        }
+
+        capturedPlayerPanelLayouts = new PlayerPanelLayout[players.Length];
+        for (int i = 0; i < players.Length; i++)
         {
             if (players[i] == null || !players[i].TryGetComponent(out RectTransform rectTransform))
             {
@@ -1377,6 +1391,18 @@ public class GameController : MonoBehaviour
         }
 
         playerPanelLayoutsCaptured = true;
+    }
+
+    private static int GetRotatedLayoutIndex(int seatIndex, int localSeatIndex, int layoutCount)
+    {
+        if (layoutCount <= 0)
+        {
+            return 0;
+        }
+
+        int normalizedSeatIndex = ((seatIndex % layoutCount) + layoutCount) % layoutCount;
+        int normalizedLocalSeatIndex = ((localSeatIndex % layoutCount) + layoutCount) % layoutCount;
+        return (normalizedSeatIndex - normalizedLocalSeatIndex + layoutCount) % layoutCount;
     }
 
     private static void ApplyPlayerPanelLayout(PlayerUI player, PlayerPanelLayout layout)
