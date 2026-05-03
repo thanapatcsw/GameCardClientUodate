@@ -243,7 +243,7 @@ public class QuizManager : MonoBehaviour
         }
     }
 
-    public void ProcessQuizResults(List<PlayerAnswer> answers, List<int> forcedRewardGemIndices = null)
+    public void ProcessQuizResults(List<PlayerAnswer> answers, List<int> forcedRewardGemIndices = null, bool applyRewardsToState = true)
     {
         int totalPlayers = GetTotalPlayersForQuiz();
         if (totalPlayers <= 0)
@@ -266,7 +266,10 @@ public class QuizManager : MonoBehaviour
 
         if (hasWinner)
         {
-            string rewardMessage = ApplyRewardGemIndices(winner.playerIndex, forcedRewardGemIndices ?? new List<int>());
+            List<int> rewardGemIndices = forcedRewardGemIndices ?? new List<int>();
+            string rewardMessage = applyRewardsToState
+                ? ApplyRewardGemIndices(winner.playerIndex, rewardGemIndices)
+                : DescribeRewardGemIndices(rewardGemIndices);
             Debug.Log($"<color=green>ผู้เล่น {winner.playerIndex + 1} ชนะควิซ! {rewardMessage}</color>");
 
             if (rewardText != null)
@@ -399,7 +402,7 @@ public class QuizManager : MonoBehaviour
             })
             .ToList();
 
-        ProcessQuizResults(syncedAnswers, rewardGemIndices);
+        ProcessQuizResults(syncedAnswers, rewardGemIndices, applyRewardsToState: false);
     }
 
     private void UpsertAnswer(int playerIndex, bool isCorrect, float timeTaken)
@@ -528,6 +531,37 @@ public class QuizManager : MonoBehaviour
 
         winnerUI.UpdateUI();
         gameController.UpdateBankUI();
+
+        if (receivedGems.Count == 0)
+        {
+            return "ไม่ได้รับไอเทมเพิ่ม";
+        }
+
+        List<string> parts = new List<string>();
+        foreach (KeyValuePair<string, int> pair in receivedGems)
+        {
+            parts.Add($"{pair.Key} {pair.Value}");
+        }
+
+        return "ได้รับ " + string.Join(" / ", parts);
+    }
+
+    private string DescribeRewardGemIndices(List<int> rewardGemIndices)
+    {
+        Dictionary<string, int> receivedGems = new Dictionary<string, int>();
+
+        foreach (int gemIndex in rewardGemIndices ?? new List<int>())
+        {
+            string gemName = GetGemName(gemIndex);
+            if (receivedGems.ContainsKey(gemName))
+            {
+                receivedGems[gemName]++;
+            }
+            else
+            {
+                receivedGems[gemName] = 1;
+            }
+        }
 
         if (receivedGems.Count == 0)
         {

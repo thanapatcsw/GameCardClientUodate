@@ -49,7 +49,7 @@ public class GameController : MonoBehaviour
     public int currentTurnDisplay = 1; // [NEW] เลขเทิร์นสำหรับเอาไปติดใน UI (นับ 1, 2, 3...)
     public int totalTurnCount = 0;    // ตัวแปรนับตามระบบโปรแกรม
     public int quizInterval = 5;      // ช่วงเวลาเรียกควิซในโหมดออฟไลน์
-    public int onlineQuizTurnInterval = 4;
+    public int onlineQuizTurnInterval = 4; // ใช้เป็นช่วง "รอบ" ของควิซในโหมดออนไลน์
     private bool isGameOver = false; 
 
 
@@ -842,13 +842,13 @@ public class GameController : MonoBehaviour
         UpdateTurnCountUI();
 
         bool shouldStartQuiz = isOnlineMatchMode
-            ? totalTurnCount > 0 && totalTurnCount % Mathf.Max(1, onlineQuizTurnInterval) == 0
+            ? isNewRound && currentTurnDisplay > 1 && currentTurnDisplay % Mathf.Max(1, onlineQuizTurnInterval) == 0
             : isNewRound && currentTurnDisplay > 1 && currentTurnDisplay % Mathf.Max(1, quizInterval) == 0;
 
         if (shouldStartQuiz) {
             if (QuizManager.Instance != null) {
                 string quizTriggerLabel = isOnlineMatchMode
-                    ? $"เทิร์นที่ {totalTurnCount}"
+                    ? $"รอบที่ {currentTurnDisplay}"
                     : $"รอบที่ {currentTurnDisplay}";
                 Debug.Log($"<color=cyan>[Quiz] {quizTriggerLabel} -> ถึงเวลาเรียกควิซแล้ว!</color>");
                 startedQuizThisTurn = true;
