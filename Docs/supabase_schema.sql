@@ -102,6 +102,24 @@ begin
     where status = 'waiting'
       and created_at < v_cutoff;
 
+    with duplicate_waiting_rows as (
+        select id
+        from (
+            select id,
+                   row_number() over (partition by player_id order by created_at desc, id desc) as row_num
+            from public.matchmaking_queue
+            where status = 'waiting'
+              and created_at >= v_cutoff
+        ) ranked_waiting
+        where row_num > 1
+    )
+    update public.matchmaking_queue
+    set status = 'cancelled',
+        room_code = null,
+        room_id = null,
+        matched_at = null
+    where id in (select id from duplicate_waiting_rows);
+
     update public.matchmaking_queue
     set status = 'cancelled',
         room_code = null,

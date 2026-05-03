@@ -441,6 +441,19 @@ public class MatchmakingClient : MonoBehaviour
 
     private string GetOrCreatePlayerId()
     {
+        if (TryGetAuthenticatedPlayerId(out string authenticatedPlayerId))
+        {
+            string cachedPlayerId = PlayerPrefs.GetString(PlayerIdPrefsKey, string.Empty);
+            if (!string.Equals(cachedPlayerId, authenticatedPlayerId, StringComparison.Ordinal))
+            {
+                Debug.Log($"[Matchmaking] Syncing cached playerId to authenticated user. Cached={cachedPlayerId}, Authenticated={authenticatedPlayerId}");
+                PlayerPrefs.SetString(PlayerIdPrefsKey, authenticatedPlayerId);
+                PlayerPrefs.Save();
+            }
+
+            return authenticatedPlayerId;
+        }
+
         string savedPlayerId = PlayerPrefs.GetString(PlayerIdPrefsKey, string.Empty);
         if (TryNormalizeUuid(savedPlayerId, out string normalizedSavedPlayerId))
         {
@@ -451,15 +464,6 @@ public class MatchmakingClient : MonoBehaviour
             }
 
             return normalizedSavedPlayerId;
-        }
-
-        var currentUser = SupabaseManager.Instance?.Client?.Auth?.CurrentUser;
-        if (currentUser != null)
-        {
-            if (TryNormalizeUuid(currentUser.Id, out string normalizedCurrentUserId))
-            {
-                savedPlayerId = normalizedCurrentUserId;
-            }
         }
 
         if (string.IsNullOrWhiteSpace(savedPlayerId))
@@ -475,6 +479,14 @@ public class MatchmakingClient : MonoBehaviour
         PlayerPrefs.SetString(PlayerIdPrefsKey, savedPlayerId);
         PlayerPrefs.Save();
         return savedPlayerId;
+    }
+
+    private static bool TryGetAuthenticatedPlayerId(out string authenticatedPlayerId)
+    {
+        authenticatedPlayerId = string.Empty;
+
+        var currentUser = SupabaseManager.Instance?.Client?.Auth?.CurrentUser;
+        return currentUser != null && TryNormalizeUuid(currentUser.Id, out authenticatedPlayerId);
     }
 
     private static string CreateUuidString()
