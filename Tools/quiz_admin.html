@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Startup City - Quiz Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e1a;--surface:#111827;--surface2:#1f2937;--border:#374151;--accent:#6366f1;--accent2:#818cf8;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--cyan:#06b6d4;--text:#f9fafb;--text2:#9ca3af;--cpu:#ef4444;--ram:#3b82f6;--storage:#6b7280;--network:#a855f7;--security:#eab308}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:linear-gradient(135deg,#1e1b4b,#312e81);padding:20px 32px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.header h1{font-size:1.5rem;font-weight:700;background:linear-gradient(90deg,var(--accent2),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .stats{display:flex;gap:16px;flex-wrap:wrap}
+.stat{background:var(--surface);padding:6px 14px;border-radius:8px;font-size:.85rem;border:1px solid var(--border)}
+.stat b{color:var(--accent2)}
+.toolbar{padding:16px 32px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);background:var(--surface)}
+.btn{padding:8px 18px;border:none;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{opacity:.85}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{opacity:.85}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+select,input[type=text],textarea{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.85rem;font-family:inherit;outline:none;transition:border .2s}
+select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+.filter-group{display:flex;gap:8px;align-items:center;margin-left:auto}
+.filter-group label{font-size:.8rem;color:var(--text2)}
+.main{padding:24px 32px;display:flex;gap:24px}
+.list-panel{flex:1;min-width:0}
+.edit-panel{width:420px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:sticky;top:20px;max-height:calc(100vh - 120px);overflow-y:auto}
+.edit-panel h3{margin-bottom:16px;font-size:1.1rem;color:var(--accent2)}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.8rem;color:var(--text2);margin-bottom:4px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%}
+textarea{resize:vertical;min-height:60px}
+.choices-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice-item{position:relative}
+.choice-item input{width:100%;padding-right:32px}
+.choice-radio{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:18px;height:18px;cursor:pointer;accent-color:var(--green)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead{position:sticky;top:0;z-index:2}
+th{background:var(--surface2);padding:10px 12px;text-align:left;font-weight:600;color:var(--text2);border-bottom:2px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover{background:rgba(99,102,241,.08)}
+tr.selected{background:rgba(99,102,241,.15)}
+.cat-badge{padding:3px 10px;border-radius:12px;font-size:.75rem;font-weight:600;color:#fff;display:inline-block}
+.cat-CPU{background:var(--cpu)}.cat-RAM{background:var(--ram)}.cat-Storage{background:var(--storage)}.cat-Network{background:var(--network)}.cat-Security{background:var(--security)}
+.diff-badge{padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:600}
+.diff-basic{background:#065f46;color:#6ee7b7}.diff-intermediate{background:#78350f;color:#fcd34d}.diff-advanced{background:#7f1d1d;color:#fca5a5}
+.q-text{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions-cell{display:flex;gap:6px}
+.btn-sm{padding:4px 10px;font-size:.75rem;border-radius:6px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2)}
+#fileInput{display:none}
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;color:#fff;font-size:.85rem;font-weight:500;opacity:0;transform:translateY(20px);transition:all .3s;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-success{background:var(--green)}.toast-error{background:var(--red)}.toast-info{background:var(--accent)}
+.search-input{width:200px}
+@media(max-width:900px){.main{flex-direction:column}.edit-panel{width:100%;position:static;max-height:none}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ Startup City — Quiz Admin</h1>
+  <div class="stats">
+    <div class="stat">Total: <b id="statTotal">0</b></div>
+    <div class="stat" style="color:var(--cpu)">CPU: <b id="statCPU">0</b></div>
+    <div class="stat" style="color:var(--ram)">RAM: <b id="statRAM">0</b></div>
+    <div class="stat" style="color:var(--storage)">Storage: <b id="statSTR">0</b></div>
+    <div class="stat" style="color:var(--network)">Network: <b id="statNET">0</b></div>
+    <div class="stat" style="color:var(--security)">Security: <b id="statSEC">0</b></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-primary" onclick="addNew()">+ เพิ่มคำถาม</button>
+  <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📂 Import JSON</button>
+  <input type="file" id="fileInput" accept=".json" onchange="importJson(event)">
+  <button class="btn btn-green" onclick="exportJson()">💾 Export JSON</button>
+  <button class="btn btn-red" onclick="validateAll()">🔍 ตรวจสอบทั้งหมด</button>
+  <div class="filter-group">
+    <label>หมวด:</label>
+    <select id="filterCat" onchange="renderTable()">
+      <option value="">ทั้งหมด</option>
+      <option value="CPU">CPU</option>
+      <option value="RAM">RAM</option>
+      <option value="Storage">Storage</option>
+      <option value="Network">Network</option>
+      <option value="Security">Security</option>
+    </select>
+    <label>ระดับ:</label>
+    <select id="filterDiff" onchange="renderTable()">
+      <option value="">ทั้งหมด</option>
+      <option value="basic">Basic</option>
+      <option value="intermediate">Intermediate</option>
+      <option value="advanced">Advanced</option>
+    </select>
+    <input type="text" id="searchBox" class="search-input" placeholder="🔎 ค้นหาคำถาม..." oninput="renderTable()">
+  </div>
+</div>
+
+<div class="main">
+  <div class="list-panel">
+    <table>
+      <thead><tr><th style="width:60px">#</th><th style="width:70px">ID</th><th style="width:90px">หมวด</th><th style="width:100px">ระดับ</th><th>คำถาม</th><th style="width:110px">Actions</th></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div id="emptyState" class="empty-state" style="display:none">
+      <p>📂 ยังไม่มีคำถาม — กด Import JSON หรือ + เพิ่มคำถาม</p>
+    </div>
+  </div>
+
+  <div class="edit-panel" id="editPanel">
+    <h3 id="editTitle">✏️ เพิ่ม / แก้ไขคำถาม</h3>
+    <div class="form-group">
+      <label>ID</label>
+      <input type="text" id="fId" placeholder="e.g. CPU21">
+    </div>
+    <div class="form-group">
+      <label>หมวด (Category)</label>
+      <select id="fCat">
+        <option value="CPU">CPU</option>
+        <option value="RAM">RAM</option>
+        <option value="Storage">Storage</option>
+        <option value="Network">Network</option>
+        <option value="Security">Security</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ระดับ (Difficulty)</label>
+      <select id="fDiff">
+        <option value="basic">Basic</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>คำถาม</label>
+      <textarea id="fQuestion" rows="3" placeholder="พิมพ์คำถามที่นี่..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>ตัวเลือก (เลือก ◉ = คำตอบที่ถูกต้อง)</label>
+      <div class="choices-grid">
+        <div class="choice-item"><input type="text" id="fC0" placeholder="ตัวเลือก 1"><input type="radio" name="correct" value="0" class="choice-radio" checked></div>
+        <div class="choice-item"><input type="text" id="fC1" placeholder="ตัวเลือก 2"><input type="radio" name="correct" value="1" class="choice-radio"></div>
+        <div class="choice-item"><input type="text" id="fC2" placeholder="ตัวเลือก 3"><input type="radio" name="correct" value="2" class="choice-radio"></div>
+        <div class="choice-item"><input type="text" id="fC3" placeholder="ตัวเลือก 4"><input type="radio" name="correct" value="3" class="choice-radio"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-green" onclick="saveQuestion()" style="flex:1">💾 บันทึก</button>
+      <button class="btn btn-outline" onclick="clearForm()" style="flex:1">🗑️ ล้างฟอร์ม</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let questions = [];
+let editingIdx = -1;
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = questions.length;
+  const cats = ['CPU','RAM','Storage','Network','Security'];
+  const ids = ['statCPU','statRAM','statSTR','statNET','statSEC'];
+  cats.forEach((c,i) => {
+    document.getElementById(ids[i]).textContent = questions.filter(q=>q.category===c).length;
+  });
+}
+
+function renderTable() {
+  const cat = document.getElementById('filterCat').value;
+  const diff = document.getElementById('filterDiff').value;
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+
+  let filtered = questions.map((q,i)=>({...q,_idx:i}));
+  if(cat) filtered = filtered.filter(q=>q.category===cat);
+  if(diff) filtered = filtered.filter(q=>q.difficulty===diff);
+  if(search) filtered = filtered.filter(q=>q.question.toLowerCase().includes(search)||q.id.toLowerCase().includes(search));
+
+  if(filtered.length===0){tbody.innerHTML='';empty.style.display='block';updateStats();return;}
+  empty.style.display='none';
+
+  tbody.innerHTML = filtered.map((q,i) => `
+    <tr class="${editingIdx===q._idx?'selected':''}" ondblclick="editQuestion(${q._idx})">
+      <td>${i+1}</td>
+      <td><code>${q.id}</code></td>
+      <td><span class="cat-badge cat-${q.category}">${q.category}</span></td>
+      <td><span class="diff-badge diff-${q.difficulty}">${q.difficulty}</span></td>
+      <td class="q-text" title="${q.question.replace(/"/g,'&quot;')}">${q.question}</td>
+      <td class="actions-cell">
+        <button class="btn btn-sm btn-primary" onclick="editQuestion(${q._idx})">✏️</button>
+        <button class="btn btn-sm btn-red" onclick="deleteQuestion(${q._idx})">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+  updateStats();
+}
+
+function editQuestion(idx) {
+  const q = questions[idx];
+  editingIdx = idx;
+  document.getElementById('fId').value = q.id;
+  document.getElementById('fCat').value = q.category;
+  document.getElementById('fDiff').value = q.difficulty;
+  document.getElementById('fQuestion').value = q.question;
+  for(let i=0;i<4;i++) document.getElementById('fC'+i).value = q.choices[i]||'';
+  document.querySelector(`input[name=correct][value="${q.correctIndex}"]`).checked = true;
+  document.getElementById('editTitle').textContent = `✏️ แก้ไข: ${q.id}`;
+  renderTable();
+}
+
+function deleteQuestion(idx) {
+  if(!confirm(`ลบคำถาม ${questions[idx].id} ?`)) return;
+  questions.splice(idx,1);
+  if(editingIdx===idx) clearForm();
+  else if(editingIdx>idx) editingIdx--;
+  renderTable();
+  showToast('ลบคำถามแล้ว','error');
+}
+
+function saveQuestion() {
+  const id = document.getElementById('fId').value.trim();
+  const cat = document.getElementById('fCat').value;
+  const diff = document.getElementById('fDiff').value;
+  const question = document.getElementById('fQuestion').value.trim();
+  const choices = [0,1,2,3].map(i=>document.getElementById('fC'+i).value.trim());
+  const correctIndex = parseInt(document.querySelector('input[name=correct]:checked').value);
+
+  if(!id){showToast('กรุณากรอก ID','error');return;}
+  if(!question){showToast('กรุณากรอกคำถาม','error');return;}
+  if(choices.some(c=>!c)){showToast('กรุณากรอกตัวเลือกครบทั้ง 4 ข้อ','error');return;}
+
+  // Check duplicate ID
+  const dupIdx = questions.findIndex(q=>q.id===id);
+  if(dupIdx!==-1 && dupIdx!==editingIdx){showToast(`ID "${id}" ซ้ำกับคำถามที่มีอยู่แล้ว!`,'error');return;}
+
+  const entry = {id,category:cat,difficulty:diff,question,choices,correctIndex};
+
+  if(editingIdx>=0){
+    questions[editingIdx] = entry;
+    showToast(`อัปเดต ${id} สำเร็จ!`,'success');
+  } else {
+    questions.push(entry);
+    showToast(`เพิ่ม ${id} สำเร็จ!`,'success');
+  }
+  clearForm();
+  renderTable();
+}
+
+function addNew() {
+  clearForm();
+  // Auto-generate next ID
+  const cat = document.getElementById('fCat').value;
+  const prefix = cat==='Storage'?'STR':cat==='Network'?'NET':cat==='Security'?'SEC':cat;
+  const existing = questions.filter(q=>q.category===cat).length;
+  document.getElementById('fId').value = prefix + String(existing+1).padStart(2,'0');
+  document.getElementById('fQuestion').focus();
+}
+
+function clearForm() {
+  editingIdx = -1;
+  document.getElementById('fId').value = '';
+  document.getElementById('fQuestion').value = '';
+  for(let i=0;i<4;i++) document.getElementById('fC'+i).value = '';
+  document.querySelector('input[name=correct][value="0"]').checked = true;
+  document.getElementById('editTitle').textContent = '✏️ เพิ่ม / แก้ไขคำถาม';
+  renderTable();
+}
+
+function importJson(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.questions && Array.isArray(data.questions)){
+        questions = data.questions;
+        renderTable();
+        showToast(`โหลด ${questions.length} คำถามสำเร็จ!`,'success');
+      } else {
+        showToast('รูปแบบ JSON ไม่ถูกต้อง','error');
+      }
+    } catch(err) {
+      showToast('ไฟล์ JSON ไม่ถูกต้อง: ' + err.message,'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function exportJson() {
+  const data = {version:"1.0",totalQuestions:questions.length,questions};
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'quiz_database.json'; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Export ${questions.length} คำถามสำเร็จ!`,'success');
+}
+
+function validateAll() {
+  let issues = [];
+  const ids = new Set();
+  questions.forEach((q,i) => {
+    if(!q.id) issues.push(`#${i+1}: ไม่มี ID`);
+    if(ids.has(q.id)) issues.push(`#${i+1}: ID "${q.id}" ซ้ำ`);
+    ids.add(q.id);
+    if(!q.question) issues.push(`${q.id}: ไม่มีคำถาม`);
+    if(!q.choices||q.choices.length!==4) issues.push(`${q.id}: ตัวเลือกไม่ครบ 4 ข้อ`);
+    else if(q.choices.some(c=>!c||!c.trim())) issues.push(`${q.id}: มีตัวเลือกว่าง`);
+    if(q.correctIndex<0||q.correctIndex>3) issues.push(`${q.id}: correctIndex ไม่ถูกต้อง`);
+    if(q.question && q.question.length > 80) issues.push(`${q.id}: คำถามยาวเกิน 80 ตัวอักษร (${q.question.length})`);
+  });
+  if(issues.length===0) showToast('✅ ผ่านการตรวจสอบทั้งหมด!','success');
+  else alert('⚠️ พบปัญหา:\n\n' + issues.join('\n'));
+}
+
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast toast-${type} show`;
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+// Init
+renderTable();
+</script>
+</body>
+</html>

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Startup City - Developer Registration</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Bai+Jamjuree:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #bc13fe;
+            --accent: #ff00ff;
+            --bg: #050811;
+            --glass: rgba(15, 23, 42, 0.7);
+            --border: rgba(0, 243, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Bai Jamjuree', sans-serif;
+            background: var(--bg);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(0, 243, 255, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(188, 19, 254, 0.1) 0%, transparent 40%);
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            perspective: 1000px;
+        }
+
+        .register-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                        0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+            animation: cardEntrance 0.8s ease-out forwards;
+        }
+
+        @keyframes cardEntrance {
+            from { opacity: 0; transform: translateY(30px) rotateX(-10deg); }
+            to { opacity: 1; transform: translateY(0) rotateX(0); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 28px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #8a94b5;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--primary);
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: #fff;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(0, 243, 255, 0.2);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(188, 19, 254, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+
+        .footer {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 13px;
+            color: #8a94b5;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        #passMatch {
+            font-size: 11px;
+            margin-top: 4px;
+            display: block;
+            min-height: 14px;
+        }
+
+        .match-ok { color: #00ff88; }
+        .match-fail { color: #ff3366; }
+
+        .swal2-popup {
+            background: #0f172a !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 20px !important;
+        }
+
+        /* ───── OTP step ───── */
+        .hidden { display: none !important; }
+
+        .otp-info {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .otp-info b {
+            color: var(--primary);
+            word-break: break-all;
+        }
+
+        .otp-group-label {
+            text-align: center;
+            font-size: 11px;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .otp-inputs {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .otp-inputs input {
+            width: 42px;
+            height: 52px;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            padding: 0;
+            letter-spacing: 0;
+            border-radius: 10px;
+            background: rgba(0, 243, 255, 0.04);
+            border: 1px solid var(--border);
+            color: #fff;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .otp-inputs input:focus {
+            border-color: var(--accent);
+            background: rgba(255, 0, 255, 0.08);
+            box-shadow: 0 0 14px rgba(255, 0, 255, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .otp-inputs input.filled {
+            border-color: var(--primary);
+            background: rgba(0, 243, 255, 0.08);
+            box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
+        }
+
+        .otp-separator {
+            color: #475569;
+            font-size: 20px;
+            font-weight: 700;
+            padding: 0 2px;
+            user-select: none;
+        }
+
+        .resend-row {
+            text-align: center;
+            margin-top: 14px;
+            font-size: 13px;
+            color: #8a94b5;
+        }
+
+        .resend-row button {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 4px;
+        }
+
+        .resend-row button:disabled {
+            color: #475569;
+            cursor: not-allowed;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 12px;
+            font-size: 12px;
+            color: #8a94b5;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .back-link:hover { color: var(--primary); }
+    </style>
+</head>
+
+<body>
+    <div class="particles" id="particles"></div>
+
+    <div class="container">
+        <!-- ───── Step 1: Register form ───── -->
+        <div class="register-card" id="registerCard">
+            <div class="header">
+                <div class="logo">STARTUP CITY</div>
+                <div class="subtitle">The Great Hackathon: Register New Developer</div>
+            </div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="username">Username / ชื่อที่แสดงในเกม</label>
+                    <input type="text" id="username" required placeholder="เช่น นายประหยัด, DevKeng" minlength="3">
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Developer Email / อีเมล</label>
+                    <input type="email" id="email" required placeholder="example@email.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Access Code / รหัสผ่าน</label>
+                    <input type="password" id="password" required placeholder="อย่างน้อย 6 ตัวอักษร" minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Access Code / ยืนยันรหัสผ่าน</label>
+                    <input type="password" id="confirmPassword" required placeholder="พิมพ์รหัสผ่านอีกครั้ง">
+                    <span id="passMatch"></span>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span>SYSTEM OVERRIDE [REGISTER]</span>
+                </button>
+            </form>
+
+            <div class="footer">
+                Already have access? <a href="#">Launch Application</a>
+            </div>
+        </div>
+
+        <!-- ───── Step 2: OTP verification ───── -->
+        <div class="register-card hidden" id="otpCard">
+            <div class="header">
+                <div class="logo">VERIFY EMAIL</div>
+                <div class="subtitle">Enter the 8-digit code from your email</div>
+            </div>
+
+            <div class="otp-info">
+                📧 เราส่งรหัส OTP ไปยัง<br>
+                <b id="otpEmailDisplay">—</b><br>
+                <span style="font-size:11px;color:#64748b;">รหัสมีอายุ 10 นาที</span>
+            </div>
+
+            <form id="otpForm">
+                <div class="otp-group-label">กรอกรหัส 8 หลัก</div>
+                <div class="otp-inputs" id="otpInputs">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="0" autocomplete="one-time-code">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="1">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="2">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="3">
+                    <span class="otp-separator">–</span>
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="4">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="5">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="6">
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="7">
+                </div>
+
+                <button type="submit" class="submit-btn" id="verifyBtn">
+                    <span>VERIFY [CONFIRM]</span>
+                </button>
+            </form>
+
+            <div class="resend-row">
+                ไม่ได้รับอีเมล?
+                <button type="button" id="resendBtn">ส่งรหัสใหม่</button>
+            </div>
+
+            <a class="back-link" id="backToRegister">← กลับไปแก้ไขข้อมูล</a>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uwspzhwvjpkcjpoqgkhp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3B6aHd2anBrY2pwb3Fna2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzUwMzYsImV4cCI6MjA5MDQxMTAzNn0.hgTN21pBcTD2meqXxKnydit0U7inI3OpMOAFVy9NtEE';
+
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const form = document.getElementById('registerForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('confirmPassword');
+        const matchLabel = document.getElementById('passMatch');
+
+        function checkMatch() {
+            if (!confirmInput.value) {
+                matchLabel.textContent = '';
+                return;
+            }
+            if (passwordInput.value === confirmInput.value) {
+                matchLabel.textContent = 'รหัสผ่านตรงกัน';
+                matchLabel.className = 'match-ok';
+            } else {
+                matchLabel.textContent = 'รหัสผ่านไม่ตรงกัน';
+                matchLabel.className = 'match-fail';
+            }
+        }
+
+        passwordInput.addEventListener('input', checkMatch);
+        confirmInput.addEventListener('input', checkMatch);
+
+        // ───── DOM refs for OTP step ─────
+        const registerCard = document.getElementById('registerCard');
+        const otpCard      = document.getElementById('otpCard');
+        const otpForm      = document.getElementById('otpForm');
+        const otpInputs    = Array.from(document.querySelectorAll('#otpInputs input'));
+        const otpEmailDisplay = document.getElementById('otpEmailDisplay');
+        const verifyBtn    = document.getElementById('verifyBtn');
+        const resendBtn    = document.getElementById('resendBtn');
+        const backLink     = document.getElementById('backToRegister');
+
+        // เก็บข้อมูลที่กรอกไว้ระหว่างขั้นตอน
+        let pendingSignup = null;   // { email, password, username }
+        let resendCooldown = 0;     // วินาที
+        let resendTimer = null;
+
+        // ───── Step 1: Sign up handler ─────
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const password = passwordInput.value.trim();
+            const confirmPassword = confirmInput.value.trim();
+            const username = document.getElementById('username').value.trim();
+
+            if (password !== confirmPassword) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'รหัสผ่านไม่ตรงกัน',
+                    text: 'กรุณาตรวจสอบรหัสผ่านทั้งสองช่องให้ตรงกันครับ',
+                    confirmButtonColor: '#bc13fe'
+                });
+                return;
+            }
+
+            if (password.length < 6) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'รหัสผ่านสั้นเกินไป',
+                    text: 'คุณต้องระบุรหัสอย่างน้อย 6 ตัวเพื่อความปลอดภัยครับ',
+                    confirmButtonColor: '#00f3ff'
+                });
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>SENDING OTP...</span>';
+
+            try {
+                const { data, error } = await _supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: { username: username }
+                    }
+                });
+
+                if (error) throw error;
+
+                // เก็บข้อมูลไว้สำหรับขั้นตอน verify
+                pendingSignup = { email, password, username };
+
+                // เปลี่ยนไปหน้า OTP
+                otpEmailDisplay.textContent = email;
+                registerCard.classList.add('hidden');
+                otpCard.classList.remove('hidden');
+                clearOtpInputs();
+                otpInputs[0].focus();
+                startResendCooldown(60);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ส่งรหัส OTP แล้ว',
+                    text: 'กรุณาเช็คอีเมลเพื่อรับรหัสยืนยัน 6 หลัก',
+                    confirmButtonText: 'รับทราบ',
+                    confirmButtonColor: '#00f3ff',
+                    timer: 2500
+                });
+            } catch (error) {
+                console.error(error);
+                let errorMsg = 'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ';
+
+                if (error.message.includes("already registered")) {
+                    errorMsg = 'อีเมลนี้ถูกใช้งานไปแล้ว กรุณาใช้อีเมลอื่นในการสมัคร';
+                } else if (error.message.includes("valid email") || error.message.includes("invalid email")) {
+                    errorMsg = 'รูปแบบอีเมลไม่ถูกต้อง';
+                } else if (error.message.includes("rate limit")) {
+                    errorMsg = 'ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่';
+                } else {
+                    errorMsg = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ล้มเหลว!',
+                    text: errorMsg,
+                    confirmButtonColor: '#ff3366'
+                });
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>SYSTEM OVERRIDE [REGISTER]</span>';
+            }
+        });
+
+        // ───── Step 2: OTP input helpers ─────
+        function clearOtpInputs() {
+            otpInputs.forEach(inp => inp.value = '');
+        }
+
+        function readOtp() {
+            return otpInputs.map(inp => inp.value).join('');
+        }
+
+        otpInputs.forEach((inp, idx) => {
+            inp.addEventListener('input', () => {
+                inp.value = inp.value.replace(/\D/g, '').slice(0, 1);
+                // เพิ่ม/ลบ class filled เพื่อ highlight
+                inp.value ? inp.classList.add('filled') : inp.classList.remove('filled');
+                if (inp.value && idx < otpInputs.length - 1) {
+                    otpInputs[idx + 1].focus();
+                }
+                // auto-submit เมื่อกรอกครบ 8 หลัก
+                if (idx === otpInputs.length - 1 && readOtp().length === 8) {
+                    otpForm.requestSubmit();
+                }
+            });
+
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace') {
+                    if (!inp.value && idx > 0) {
+                        otpInputs[idx - 1].focus();
+                        otpInputs[idx - 1].classList.remove('filled');
+                    } else {
+                        inp.classList.remove('filled');
+                    }
+                }
+            });
+
+            inp.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = text.replace(/\D/g, '').slice(0, 8);
+                digits.split('').forEach((d, i) => {
+                    if (otpInputs[i]) {
+                        otpInputs[i].value = d;
+                        otpInputs[i].classList.add('filled');
+                    }
+                });
+                if (digits.length === 8) otpForm.requestSubmit();
+                else if (otpInputs[digits.length]) otpInputs[digits.length].focus();
+            });
+        });
+
+        // ───── Step 2: Verify OTP ─────
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!pendingSignup) return;
+
+            const token = readOtp();
+            if (token.length !== 8) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรอกรหัสไม่ครบ',
+                    text: 'กรุณากรอก OTP ให้ครบ 8 หลัก',
+                    confirmButtonColor: '#00f3ff'
+                });
+                return;
+            }
+
+            verifyBtn.disabled = true;
+            verifyBtn.innerHTML = '<span>VERIFYING...</span>';
+
+            try {
+                const { data, error } = await _supabase.auth.verifyOtp({
+                    email: pendingSignup.email,
+                    token: token,
+                    type: 'signup'
+                });
+
+                if (error) throw error;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ยืนยันสำเร็จ!',
+                    text: `ยินดีต้อนรับคุณ ${pendingSignup.username}! สามารถใช้อีเมลและรหัสผ่านนี้ Login ในเกมได้เลย`,
+                    confirmButtonText: 'รับทราบ',
+                    confirmButtonColor: '#00f3ff'
+                }).then(() => {
+                    // reset ทุกอย่าง กลับไปหน้าแรก
+                    form.reset();
+                    matchLabel.textContent = '';
+                    clearOtpInputs();
+                    pendingSignup = null;
+                    otpCard.classList.add('hidden');
+                    registerCard.classList.remove('hidden');
+                });
+            } catch (error) {
+                console.error(error);
+                let errorMsg = 'รหัส OTP ไม่ถูกต้อง';
+
+                if (error.message.includes('expired')) {
+                    errorMsg = 'รหัส OTP หมดอายุแล้ว กรุณากดส่งรหัสใหม่';
+                } else if (error.message.includes('invalid') || error.message.includes('Token')) {
+                    errorMsg = 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบและลองอีกครั้ง';
+                } else {
+                    errorMsg = error.message;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ยืนยันไม่สำเร็จ',
+                    text: errorMsg,
+                    confirmButtonColor: '#ff3366'
+                });
+                clearOtpInputs();
+                otpInputs[0].focus();
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = '<span>VERIFY [CONFIRM]</span>';
+            }
+        });
+
+        // ───── Step 2: Resend OTP ─────
+        function startResendCooldown(seconds) {
+            resendCooldown = seconds;
+            resendBtn.disabled = true;
+            updateResendLabel();
+            clearInterval(resendTimer);
+            resendTimer = setInterval(() => {
+                resendCooldown--;
+                if (resendCooldown <= 0) {
+                    clearInterval(resendTimer);
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'ส่งรหัสใหม่';
+                } else {
+                    updateResendLabel();
+                }
+            }, 1000);
+        }
+
+        function updateResendLabel() {
+            resendBtn.textContent = `ส่งรหัสใหม่ (${resendCooldown}s)`;
+        }
+
+        resendBtn.addEventListener('click', async () => {
+            if (!pendingSignup || resendBtn.disabled) return;
+
+            resendBtn.disabled = true;
+            resendBtn.textContent = 'กำลังส่ง...';
+
+            try {
+                const { error } = await _supabase.auth.resend({
+                    type: 'signup',
+                    email: pendingSignup.email
+                });
+                if (error) throw error;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ส่งรหัสใหม่แล้ว',
+                    text: 'กรุณาเช็คอีเมล (อาจอยู่ในโฟลเดอร์ Spam)',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                clearOtpInputs();
+                otpInputs[0].focus();
+                startResendCooldown(60);
+            } catch (error) {
+                console.error(error);
+                let msg = error.message;
+                if (msg.includes('rate limit') || msg.includes('For security')) {
+                    msg = 'ส่งบ่อยเกินไป กรุณารอประมาณ 1 นาทีแล้วลองใหม่';
+                }
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ส่งรหัสไม่สำเร็จ',
+                    text: msg,
+                    confirmButtonColor: '#ff3366'
+                });
+                resendBtn.disabled = false;
+                resendBtn.textContent = 'ส่งรหัสใหม่';
+            }
+        });
+
+        // ───── ปุ่มย้อนกลับไปหน้าสมัคร ─────
+        backLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            Swal.fire({
+                title: 'กลับไปแก้ไขข้อมูล?',
+                text: 'หากกลับไปจะต้องสมัครและรับ OTP ใหม่อีกครั้ง',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'ใช่ ย้อนกลับ',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#bc13fe',
+                cancelButtonColor: '#475569'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    clearInterval(resendTimer);
+                    pendingSignup = null;
+                    clearOtpInputs();
+                    otpCard.classList.add('hidden');
+                    registerCard.classList.remove('hidden');
+                }
+            });
+        });
+
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.style.position = 'absolute';
+                particle.style.width = Math.random() * 3 + 'px';
+                particle.style.height = particle.style.width;
+                particle.style.background = Math.random() > 0.5 ? '#00f3ff' : '#bc13fe';
+                particle.style.borderRadius = '50%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.opacity = Math.random() * 0.5;
+                particle.style.boxShadow = `0 0 10px ${particle.style.background}`;
+                container.appendChild(particle);
+            }
+        }
+
+        createParticles();
+    </script>
+</body>
+
+</html>

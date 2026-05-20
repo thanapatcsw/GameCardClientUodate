@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76b20de1444fa4d47acb9f68c922495f, type: 3}
+  m_Name: ShopItem_Rainbow
+  m_EditorClassIdentifier: Assembly-CSharp::ShopItemData
+  itemId: frame_rainbow
+  itemName: "\u0E01\u0E23\u0E2D\u0E1A\u0E2A\u0E32\u0E22\u0E23\u0E38\u0E49\u0E07"
+  itemNameEn: Rainbow Frame
+  description: "\u0E01\u0E23\u0E2D\u0E1A\u0E42\u0E2E\u0E42\u0E25\u0E41\u0E01\u0E23\u0E21
+    \u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E35\u0E23\u0E30\u0E22\u0E34\u0E1A\u0E23\u0E30\u0E22\u0E31\u0E1A
+    \u0E44\u0E2D\u0E40\u0E17\u0E21 Legendary!"
+  price: 100
+  previewSprite: {fileID: 1283610321963738728, guid: e82822e7f16186049a70dd11cde67458, type: 3}
+  frameSprite: {fileID: 1283610321963738728, guid: e82822e7f16186049a70dd11cde67458, type: 3}
+  frameColor: {r: 1, g: 0.41, b: 0.71, a: 1}
+  itemType: 0

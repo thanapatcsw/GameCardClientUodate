@@ -1,0 +1,963 @@
+using UnityEngine;
+using Fusion;
+using Fusion.Sockets;
+using System.Collections.Generic;
+using System;
+using System.IO;
+using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Text;
+using System.Globalization;
+
+public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
+{
+    public static FusionManager Instance { get; private set; }
+    public event Action PlayerNamesUpdated;
+    public event Action ActivePlayersChanged;
+    public event Action<int, int, int, int> TurnStateReceived;
+    public event Action<int> QuizStartedReceived;
+    public event Action<QuizAnswerSnapshot> QuizAnswerReceived;
+    public event Action<List<QuizAnswerSnapshot>, List<int>> QuizResultsReceived;
+    public event Action<EconomyStateSnapshot> EconomyStateReceived;
+
+    private const char PlayerNameSeparator = '|';
+    private const string PlayerNameMessageType = "NAME";
+    private const string TurnStateMessageType = "TURN";
+    private const string QuizStartMessageType = "QUIZSTART";
+    private const string QuizAnswerMessageType = "QUIZANSWER";
+    private const string QuizResultMessageType = "QUIZRESULT";
+    private const string EconomyStateMessageType = "ECON";
+    private NetworkRunner _runner;
+    private NetworkSceneManagerDefault _sceneManager;
+    private readonly Dictionary<int, string> _playerNames = new Dictionary<int, string>();
+    private bool _hasPendingQuizStart;
+    private int _pendingQuizStartIndex = -1;
+
+    public struct QuizAnswerSnapshot
+    {
+        public int PlayerIndex;
+        public bool IsCorrect;
+        public float TimeTaken;
+    }
+
+    public struct EconomyPlayerSnapshot
+    {
+        public int Score;
+        public int[] Coins;
+        public int[] Bonuses;
+        public int QuizBlackCoins;
+    }
+
+    public struct EconomyStateSnapshot
+    {
+        public int[] BankCoins;
+        public EconomyPlayerSnapshot[] Players;
+    }
+
+    [Header("---- Scene Names ----")]
+    public string gameSceneName = "SampleScene";
+
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else if (Instance != this)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    public bool IsMasterClient => _runner != null && _runner.IsServer;
+    public NetworkRunner Runner => _runner;
+    public int ActivePlayerCount => _runner == null ? 0 : _runner.ActivePlayers.Count();
+
+    public void StartMatchedGame(string roomCode, string sceneName = null)
+    {
+        // [FIX] ระบุว่าเป็นโหมดออนไลน์
+        PlayerPrefs.SetString("GameMode", "Online");
+        PlayerPrefs.Save();
+
+        // ถ้ามีการระบุชื่อฉากมา (เช่น จาก Auto-Match) ให้โหลดฉากนั้นทันที
+        // แต่ถ้าไม่มี (เช่น จากการสร้างห้องแมนนวล) ให้ส่ง null เพื่อรอในหน้า Lobby
+        _ = StartGame(GameMode.AutoHostOrClient, roomCode, sceneName);
+    }
+
+    public void LoadGameScene()
+    {
+        if (_runner != null && _runner.IsServer)
+        {
+            string sceneToLoad = string.IsNullOrEmpty(gameSceneName) ? "SampleScene" : gameSceneName;
+            _runner.LoadScene(ResolveSceneRef(sceneToLoad), UnityEngine.SceneManagement.LoadSceneMode.Single);
+        }
+    }
+
+    public async Task StartGame(GameMode mode, string roomName, string sceneToLoad = null)
+    {
+        // [FIX] ระบุว่าเป็นโหมดออนไลน์เสมอเมื่อมีการเริ่ม Network
+        PlayerPrefs.SetString("GameMode", "Online");
+        PlayerPrefs.Save();
+
+        await ResetRunnerAsync();
+
+        _runner = gameObject.AddComponent<NetworkRunner>();
+        _sceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>();
+        _runner.AddCallbacks(this);
+        _runner.ProvideInput = true;
+        _playerNames.Clear();
+        _hasPendingQuizStart = false;
+        _pendingQuizStartIndex = -1;
+
+        // ถ้าไม่ได้ระบุฉากมา ให้ใช้ฉากปัจจุบัน (สำหรับ Lobby แมนนวล)
+        // แต่ถ้าเป็นโหมด Auto-Match หรือมีการระบุฉากมา ให้ใช้ฉากนั้นเลย
+        SceneRef targetScene;
+        if (!string.IsNullOrEmpty(sceneToLoad))
+        {
+            targetScene = ResolveSceneRef(sceneToLoad);
+        }
+        else
+        {
+            targetScene = SceneRef.FromIndex(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+        }
+
+        var result = await _runner.StartGame(new StartGameArgs()
+        {
+            GameMode = mode,
+            SessionName = roomName,
+            Scene = targetScene,
+            SceneManager = _sceneManager
+        });
+
+        if (result.Ok)
+        {
+            Debug.Log($"[Fusion] Started session successfully: {roomName} (Mode: {mode})");
+            
+            if (_runner != null && _runner.IsServer && SupabaseManager.Instance != null && SupabaseManager.Instance.IsInitialized)
+            {
+                _ = SupabaseManager.Instance.CreateRoom(roomName, roomName, 1);
+            }
+
+            // [ต่อปลั๊ก!] สั่งให้ LobbyUI แสดงหน้า RoomInfoView และโชว์รหัสห้อง
+            if (LobbyUI.Instance != null)
+            {
+                LobbyUI.Instance.SetViewState(true); // เปิดหน้า RoomInfoView
+                if (LobbyUI.Instance.roomNameText != null)
+                {
+                    LobbyUI.Instance.roomNameText.text = "Room Code : " + roomName;
+                }
+            }
+        }
+        else
+        {
+            Debug.LogError($"[Fusion] StartGame failed: {result.ShutdownReason}");
+            CleanupRunnerComponents();
+        }
+    }
+
+    public void Disconnect()
+    {
+        _ = ResetRunnerAsync();
+    }
+
+    public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
+    {
+        Debug.Log($"[Fusion] Player joined: {player}");
+
+        RegisterPlayerName(runner.LocalPlayer.PlayerId, GetLocalPlayerName(runner.LocalPlayer.PlayerId));
+
+        if (runner.IsServer && player != runner.LocalPlayer)
+        {
+            SendKnownPlayerNamesToPlayer(player);
+        }
+
+        if (player == runner.LocalPlayer && LobbyUI.Instance != null)
+        {
+            LobbyUI.Instance.SetViewState(true);
+        }
+
+        if (player == runner.LocalPlayer && !runner.IsServer)
+        {
+            SendLocalPlayerNameToServer();
+        }
+
+        RefreshPlayerList(runner);
+        NotifyActivePlayersChanged();
+    }
+
+    public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
+    {
+        Debug.Log($"[Fusion] Player left: {player}");
+        if (_playerNames.Remove(player.PlayerId))
+        {
+            NotifyPlayerNamesUpdated();
+        }
+        RefreshPlayerList(runner);
+        NotifyActivePlayersChanged();
+    }
+
+    private void RefreshPlayerList(NetworkRunner runner)
+    {
+        string list = "Players in Room:\n";
+        foreach (var p in runner.ActivePlayers)
+        {
+            list += "- Player " + p.PlayerId + (p == runner.LocalPlayer ? " (You)" : string.Empty) + "\n";
+        }
+
+        if (LobbyUI.Instance != null)
+        {
+            LobbyUI.Instance.UpdatePlayerList(list, runner.ActivePlayers.Count(), runner.IsServer);
+        }
+    }
+
+    public void OnInput(NetworkRunner runner, NetworkInput input) { }
+    public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
+
+    public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
+    {
+        Debug.Log($"[Fusion] Runner shutdown: {shutdownReason}");
+        if (runner == _runner)
+        {
+            CleanupRunnerComponents();
+        }
+        NotifyActivePlayersChanged();
+    }
+
+    public void OnConnectedToServer(NetworkRunner runner)
+    {
+        Debug.Log("[Fusion] Connected to server successfully.");
+    }
+
+    public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
+    {
+        Debug.Log($"[Fusion] Disconnected from server: {reason}");
+    }
+
+    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
+    public void OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason) { }
+    public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
+    public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList) { }
+    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
+    public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
+    public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ArraySegment<byte> data)
+    {
+        string payload = Encoding.UTF8.GetString(data.Array, data.Offset, data.Count);
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return;
+        }
+
+        string[] parts = payload.Split(PlayerNameSeparator);
+        if (parts.Length == 0)
+        {
+            return;
+        }
+
+        if (string.Equals(parts[0], PlayerNameMessageType, StringComparison.Ordinal))
+        {
+            if (parts.Length < 3 || !int.TryParse(parts[1], out int playerId))
+            {
+                return;
+            }
+
+            string playerName = string.Join(PlayerNameSeparator.ToString(), parts.Skip(2));
+            RegisterPlayerName(playerId, playerName);
+
+            if (runner.IsServer)
+            {
+                BroadcastPlayerName(player, playerId, playerName);
+            }
+
+            return;
+        }
+
+        if (string.Equals(parts[0], TurnStateMessageType, StringComparison.Ordinal))
+        {
+            if (parts.Length < 5)
+            {
+                return;
+            }
+
+            if (!int.TryParse(parts[1], out int currentPlayerIndex) ||
+                !int.TryParse(parts[2], out int currentRound) ||
+                !int.TryParse(parts[3], out int totalTurnCount) ||
+                !int.TryParse(parts[4], out int currentTurnDisplay))
+            {
+                return;
+            }
+
+            if (runner.IsServer)
+            {
+                TurnStateReceived?.Invoke(currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay);
+
+                foreach (var activePlayer in runner.ActivePlayers)
+                {
+                    if (activePlayer == player || activePlayer == runner.LocalPlayer)
+                    {
+                        continue;
+                    }
+
+                    runner.SendReliableDataToPlayer(activePlayer, default, data.ToArray());
+                }
+            }
+            else
+            {
+                TurnStateReceived?.Invoke(currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay);
+            }
+
+            return;
+        }
+
+        if (string.Equals(parts[0], QuizStartMessageType, StringComparison.Ordinal))
+        {
+            if (runner.IsServer || parts.Length < 2 || !int.TryParse(parts[1], out int questionIndex))
+            {
+                return;
+            }
+
+            _hasPendingQuizStart = true;
+            _pendingQuizStartIndex = questionIndex;
+            QuizStartedReceived?.Invoke(questionIndex);
+            return;
+        }
+
+        if (string.Equals(parts[0], QuizAnswerMessageType, StringComparison.Ordinal))
+        {
+            if (!runner.IsServer || parts.Length < 4 || !int.TryParse(parts[1], out int answerPlayerIndex))
+            {
+                return;
+            }
+
+            if (!TryParseBooleanFlag(parts[2], out bool isCorrect) ||
+                !float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float timeTaken))
+            {
+                return;
+            }
+
+            QuizAnswerReceived?.Invoke(new QuizAnswerSnapshot
+            {
+                PlayerIndex = answerPlayerIndex,
+                IsCorrect = isCorrect,
+                TimeTaken = timeTaken
+            });
+
+            return;
+        }
+
+        if (string.Equals(parts[0], QuizResultMessageType, StringComparison.Ordinal))
+        {
+            if (runner.IsServer || parts.Length < 2)
+            {
+                return;
+            }
+
+            List<QuizAnswerSnapshot> quizAnswers = DecodeQuizAnswers(parts[1]);
+            List<int> rewardGemIndices = parts.Length >= 3
+                ? DecodeRewardGemIndices(parts[2])
+                : new List<int>();
+
+            QuizResultsReceived?.Invoke(quizAnswers, rewardGemIndices);
+            return;
+        }
+
+        if (string.Equals(parts[0], EconomyStateMessageType, StringComparison.Ordinal))
+        {
+            if (parts.Length < 3)
+            {
+                return;
+            }
+
+            EconomyStateSnapshot snapshot = DecodeEconomyState(parts[1], parts[2]);
+            if (runner.IsServer)
+            {
+                EconomyStateReceived?.Invoke(snapshot);
+
+                foreach (var activePlayer in runner.ActivePlayers)
+                {
+                    if (activePlayer == player || activePlayer == runner.LocalPlayer)
+                    {
+                        continue;
+                    }
+
+                    runner.SendReliableDataToPlayer(activePlayer, default, data.ToArray());
+                }
+            }
+            else
+            {
+                EconomyStateReceived?.Invoke(snapshot);
+            }
+
+            return;
+        }
+
+        int separatorIndex = payload.IndexOf(PlayerNameSeparator);
+        if (separatorIndex <= 0 || separatorIndex >= payload.Length - 1)
+        {
+            return;
+        }
+
+        string legacyPlayerIdText = payload.Substring(0, separatorIndex);
+        string legacyPlayerName = payload.Substring(separatorIndex + 1);
+        if (!int.TryParse(legacyPlayerIdText, out int legacyPlayerId))
+        {
+            return;
+        }
+
+        RegisterPlayerName(legacyPlayerId, legacyPlayerName);
+
+        if (runner.IsServer)
+        {
+            BroadcastPlayerName(player, legacyPlayerId, legacyPlayerName);
+        }
+    }
+    public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
+    public void OnSceneLoadDone(NetworkRunner runner) { }
+    public void OnSceneLoadStart(NetworkRunner runner) { }
+    public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
+    public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
+
+    private SceneRef ResolveSceneRef(string sceneName = null)
+    {
+        string targetScene = string.IsNullOrEmpty(sceneName) ? gameSceneName : sceneName;
+        var buildIndex = FindBuildIndexByName(targetScene);
+        if (buildIndex >= 0)
+        {
+            return SceneRef.FromIndex(buildIndex);
+        }
+
+        return SceneRef.FromIndex(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
+
+    private static int FindBuildIndexByName(string sceneName)
+    {
+        if (string.IsNullOrWhiteSpace(sceneName))
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+        {
+            var scenePath = SceneUtility.GetScenePathByBuildIndex(i);
+            var buildSceneName = Path.GetFileNameWithoutExtension(scenePath);
+
+            if (string.Equals(buildSceneName, sceneName, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private async Task ResetRunnerAsync()
+    {
+        if (_runner != null)
+        {
+            try
+            {
+                await _runner.Shutdown();
+            }
+            catch (Exception shutdownException)
+            {
+                Debug.LogWarning($"[Fusion] Runner shutdown warning: {shutdownException.Message}");
+            }
+        }
+
+        CleanupRunnerComponents();
+    }
+
+    private void CleanupRunnerComponents()
+    {
+        if (_runner != null)
+        {
+            Destroy(_runner);
+            _runner = null;
+        }
+
+        if (_sceneManager != null)
+        {
+            Destroy(_sceneManager);
+            _sceneManager = null;
+        }
+    }
+
+    public string GetRemotePlayerName(int remoteIndex)
+    {
+        if (_runner == null || remoteIndex < 0)
+        {
+            return null;
+        }
+
+        var remotePlayers = _runner.ActivePlayers
+            .Where(p => p != _runner.LocalPlayer)
+            .OrderBy(p => p.PlayerId)
+            .ToList();
+
+        if (remoteIndex >= remotePlayers.Count)
+        {
+            return null;
+        }
+
+        var remotePlayer = remotePlayers[remoteIndex];
+        return _playerNames.TryGetValue(remotePlayer.PlayerId, out string remoteName)
+            ? remoteName
+            : null;
+    }
+
+    public int GetLocalPlayerSeatIndex()
+    {
+        if (_runner == null)
+        {
+            return 0;
+        }
+
+        var orderedPlayers = GetOrderedActivePlayers();
+        for (int i = 0; i < orderedPlayers.Count; i++)
+        {
+            if (orderedPlayers[i] == _runner.LocalPlayer)
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    public string GetPlayerNameBySeat(int seatIndex)
+    {
+        var orderedPlayers = GetOrderedActivePlayers();
+        if (seatIndex < 0 || seatIndex >= orderedPlayers.Count)
+        {
+            return null;
+        }
+
+        return GetDisplayNameForPlayer(orderedPlayers[seatIndex]);
+    }
+
+    public void SendTurnState(int currentPlayerIndex, int currentRound, int totalTurnCount, int currentTurnDisplay)
+    {
+        if (_runner == null)
+        {
+            return;
+        }
+
+        byte[] payload = EncodeTurnStatePayload(currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay);
+        if (_runner.IsServer)
+        {
+            foreach (var activePlayer in _runner.ActivePlayers)
+            {
+                if (activePlayer == _runner.LocalPlayer)
+                {
+                    continue;
+                }
+
+                _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+            }
+
+            return;
+        }
+
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    public void SendQuizStart(int questionIndex)
+    {
+        if (_runner == null || !_runner.IsServer)
+        {
+            return;
+        }
+
+        byte[] payload = Encoding.UTF8.GetBytes($"{QuizStartMessageType}{PlayerNameSeparator}{questionIndex}");
+        foreach (var activePlayer in _runner.ActivePlayers)
+        {
+            if (activePlayer == _runner.LocalPlayer)
+            {
+                continue;
+            }
+
+            _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+        }
+    }
+
+    public void SendQuizAnswer(int playerIndex, bool isCorrect, float timeTaken)
+    {
+        if (_runner == null || _runner.IsServer)
+        {
+            return;
+        }
+
+        string correctnessFlag = isCorrect ? "1" : "0";
+        string timeTakenText = timeTaken.ToString("0.000", CultureInfo.InvariantCulture);
+        byte[] payload = Encoding.UTF8.GetBytes(
+            $"{QuizAnswerMessageType}{PlayerNameSeparator}{playerIndex}{PlayerNameSeparator}{correctnessFlag}{PlayerNameSeparator}{timeTakenText}");
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    public void SendQuizResults(IEnumerable<QuizAnswerSnapshot> answers, IEnumerable<int> rewardGemIndices)
+    {
+        if (_runner == null || !_runner.IsServer)
+        {
+            return;
+        }
+
+        string answersPayload = EncodeQuizAnswers(answers);
+        string rewardsPayload = EncodeRewardGemIndices(rewardGemIndices);
+        byte[] payload = Encoding.UTF8.GetBytes(
+            $"{QuizResultMessageType}{PlayerNameSeparator}{answersPayload}{PlayerNameSeparator}{rewardsPayload}");
+
+        foreach (var activePlayer in _runner.ActivePlayers)
+        {
+            if (activePlayer == _runner.LocalPlayer)
+            {
+                continue;
+            }
+
+            _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+        }
+    }
+
+    public void SendEconomyState(EconomyStateSnapshot snapshot)
+    {
+        if (_runner == null)
+        {
+            return;
+        }
+
+        string bankPayload = EncodeIntArray(snapshot.BankCoins);
+        string playersPayload = EncodeEconomyPlayers(snapshot.Players);
+        byte[] payload = Encoding.UTF8.GetBytes(
+            $"{EconomyStateMessageType}{PlayerNameSeparator}{bankPayload}{PlayerNameSeparator}{playersPayload}");
+
+        if (_runner.IsServer)
+        {
+            foreach (var activePlayer in _runner.ActivePlayers)
+            {
+                if (activePlayer == _runner.LocalPlayer)
+                {
+                    continue;
+                }
+
+                _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+            }
+
+            return;
+        }
+
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    public bool TryConsumePendingQuizStart(out int questionIndex)
+    {
+        if (_hasPendingQuizStart)
+        {
+            questionIndex = _pendingQuizStartIndex;
+            _hasPendingQuizStart = false;
+            _pendingQuizStartIndex = -1;
+            return true;
+        }
+
+        questionIndex = -1;
+        return false;
+    }
+
+    private void SendLocalPlayerNameToServer()
+    {
+        if (_runner == null)
+        {
+            return;
+        }
+
+        string localName = GetLocalPlayerName(_runner.LocalPlayer.PlayerId);
+        byte[] payload = EncodePlayerNamePayload(_runner.LocalPlayer.PlayerId, localName);
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    private void SendKnownPlayerNamesToPlayer(PlayerRef targetPlayer)
+    {
+        if (_runner == null || !_runner.IsServer)
+        {
+            return;
+        }
+
+        foreach (var pair in _playerNames)
+        {
+            byte[] payload = EncodePlayerNamePayload(pair.Key, pair.Value);
+            _runner.SendReliableDataToPlayer(targetPlayer, default, payload);
+        }
+    }
+
+    private void BroadcastPlayerName(PlayerRef sourcePlayer, int playerId, string playerName)
+    {
+        if (_runner == null || !_runner.IsServer)
+        {
+            return;
+        }
+
+        byte[] payload = EncodePlayerNamePayload(playerId, playerName);
+        foreach (var activePlayer in _runner.ActivePlayers)
+        {
+            if (activePlayer == sourcePlayer)
+            {
+                continue;
+            }
+
+            _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+        }
+    }
+
+    private void RegisterPlayerName(int playerId, string playerName)
+    {
+        if (string.IsNullOrWhiteSpace(playerName))
+        {
+            return;
+        }
+
+        _playerNames[playerId] = playerName;
+        NotifyPlayerNamesUpdated();
+    }
+
+    private void NotifyPlayerNamesUpdated()
+    {
+        PlayerNamesUpdated?.Invoke();
+    }
+
+    private void NotifyActivePlayersChanged()
+    {
+        ActivePlayersChanged?.Invoke();
+    }
+
+    private static byte[] EncodePlayerNamePayload(int playerId, string playerName)
+    {
+        string safeName = string.IsNullOrWhiteSpace(playerName) ? "Player " + playerId : playerName.Trim();
+        return Encoding.UTF8.GetBytes($"{PlayerNameMessageType}{PlayerNameSeparator}{playerId}{PlayerNameSeparator}{safeName}");
+    }
+
+    private static byte[] EncodeTurnStatePayload(int currentPlayerIndex, int currentRound, int totalTurnCount, int currentTurnDisplay)
+    {
+        return Encoding.UTF8.GetBytes(
+            $"{TurnStateMessageType}{PlayerNameSeparator}{currentPlayerIndex}{PlayerNameSeparator}{currentRound}{PlayerNameSeparator}{totalTurnCount}{PlayerNameSeparator}{currentTurnDisplay}");
+    }
+
+    private List<PlayerRef> GetOrderedActivePlayers()
+    {
+        if (_runner == null)
+        {
+            return new List<PlayerRef>();
+        }
+
+        return _runner.ActivePlayers
+            .OrderBy(p => p.PlayerId)
+            .ToList();
+    }
+
+    private string GetDisplayNameForPlayer(PlayerRef player)
+    {
+        if (_playerNames.TryGetValue(player.PlayerId, out string playerName) && !string.IsNullOrWhiteSpace(playerName))
+        {
+            return playerName;
+        }
+
+        return "Player " + player.PlayerId;
+    }
+
+    private static bool TryParseBooleanFlag(string value, out bool result)
+    {
+        if (value == "1")
+        {
+            result = true;
+            return true;
+        }
+
+        if (value == "0")
+        {
+            result = false;
+            return true;
+        }
+
+        return bool.TryParse(value, out result);
+    }
+
+    private static string EncodeQuizAnswers(IEnumerable<QuizAnswerSnapshot> answers)
+    {
+        if (answers == null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(";", answers.Select(answer =>
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "{0},{1},{2:0.000}",
+                answer.PlayerIndex,
+                answer.IsCorrect ? 1 : 0,
+                answer.TimeTaken)));
+    }
+
+    private static List<QuizAnswerSnapshot> DecodeQuizAnswers(string payload)
+    {
+        var decodedAnswers = new List<QuizAnswerSnapshot>();
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return decodedAnswers;
+        }
+
+        string[] answerEntries = payload.Split(';');
+        foreach (string answerEntry in answerEntries)
+        {
+            if (string.IsNullOrWhiteSpace(answerEntry))
+            {
+                continue;
+            }
+
+            string[] answerParts = answerEntry.Split(',');
+            if (answerParts.Length < 3 ||
+                !int.TryParse(answerParts[0], out int playerIndex) ||
+                !TryParseBooleanFlag(answerParts[1], out bool isCorrect) ||
+                !float.TryParse(answerParts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float timeTaken))
+            {
+                continue;
+            }
+
+            decodedAnswers.Add(new QuizAnswerSnapshot
+            {
+                PlayerIndex = playerIndex,
+                IsCorrect = isCorrect,
+                TimeTaken = timeTaken
+            });
+        }
+
+        return decodedAnswers;
+    }
+
+    private static string EncodeRewardGemIndices(IEnumerable<int> rewardGemIndices)
+    {
+        if (rewardGemIndices == null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(",", rewardGemIndices);
+    }
+
+    private static List<int> DecodeRewardGemIndices(string payload)
+    {
+        var rewardGemIndices = new List<int>();
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return rewardGemIndices;
+        }
+
+        string[] rewardParts = payload.Split(',');
+        foreach (string rewardPart in rewardParts)
+        {
+            if (int.TryParse(rewardPart, out int gemIndex))
+            {
+                rewardGemIndices.Add(gemIndex);
+            }
+        }
+
+        return rewardGemIndices;
+    }
+
+    private static string EncodeEconomyPlayers(IEnumerable<EconomyPlayerSnapshot> players)
+    {
+        if (players == null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(";", players.Select(player =>
+            $"{player.Score}~{EncodeIntArray(player.Coins)}~{EncodeIntArray(player.Bonuses)}~{player.QuizBlackCoins}"));
+    }
+
+    private static EconomyStateSnapshot DecodeEconomyState(string bankPayload, string playersPayload)
+    {
+        var snapshot = new EconomyStateSnapshot
+        {
+            BankCoins = DecodeIntArray(bankPayload),
+            Players = System.Array.Empty<EconomyPlayerSnapshot>()
+        };
+
+        if (string.IsNullOrWhiteSpace(playersPayload))
+        {
+            return snapshot;
+        }
+
+        string[] playerEntries = playersPayload.Split(';');
+        var players = new List<EconomyPlayerSnapshot>(playerEntries.Length);
+        foreach (string playerEntry in playerEntries)
+        {
+            if (string.IsNullOrWhiteSpace(playerEntry))
+            {
+                continue;
+            }
+
+            string[] parts = playerEntry.Split('~');
+            if (parts.Length < 3 || !int.TryParse(parts[0], out int score))
+            {
+                continue;
+            }
+
+            int quizBlackCoins = 0;
+            if (parts.Length >= 4)
+            {
+                int.TryParse(parts[3], out quizBlackCoins);
+            }
+
+            players.Add(new EconomyPlayerSnapshot
+            {
+                Score = score,
+                Coins = DecodeIntArray(parts[1]),
+                Bonuses = DecodeIntArray(parts[2]),
+                QuizBlackCoins = quizBlackCoins
+            });
+        }
+
+        snapshot.Players = players.ToArray();
+        return snapshot;
+    }
+
+    private static string EncodeIntArray(IEnumerable<int> values)
+    {
+        if (values == null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(",", values);
+    }
+
+    private static int[] DecodeIntArray(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return System.Array.Empty<int>();
+        }
+
+        string[] parts = payload.Split(',');
+        int[] values = new int[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+        {
+            int.TryParse(parts[i], out values[i]);
+        }
+
+        return values;
+    }
+
+    private static string GetLocalPlayerName(int fallbackPlayerId)
+    {
+        if (SupabaseManager.Instance != null)
+        {
+            string supabaseName = SupabaseManager.Instance.GetCurrentUsername();
+            if (!string.IsNullOrWhiteSpace(supabaseName))
+            {
+                return supabaseName;
+            }
+        }
+
+        string savedName = PlayerPrefs.GetString("Username", string.Empty);
+        return string.IsNullOrWhiteSpace(savedName) ? "Player " + fallbackPlayerId : savedName;
+    }
+}
