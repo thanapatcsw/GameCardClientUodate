@@ -30,13 +30,10 @@ public class CurrencyManager : MonoBehaviour
     private static bool _isQuitting = false;
 
     private const string GEMS_KEY = "TotalGems";
-    private const string COINS_KEY = "TotalCoins";
 
     public event Action<int> OnGemsChanged;
-    public event Action<int> OnCoinsChanged;
 
     public int Gems => PlayerPrefs.GetInt(GEMS_KEY, 0);
-    public int Coins => PlayerPrefs.GetInt(COINS_KEY, 0);
 
     private void Awake()
     {
@@ -67,7 +64,7 @@ public class CurrencyManager : MonoBehaviour
         PlayerPrefs.SetInt(GEMS_KEY, Gems + amount);
         PlayerPrefs.Save();
         OnGemsChanged?.Invoke(Gems);
-        _ = PlayerDataService.SaveCurrencyAsync(Gems, Coins);
+        _ = PlayerDataService.SaveCurrencyAsync(Gems);
         Debug.Log($"[CurrencyManager] +{amount} Gems → รวม {Gems}");
     }
 
@@ -82,28 +79,18 @@ public class CurrencyManager : MonoBehaviour
         PlayerPrefs.SetInt(GEMS_KEY, Gems - amount);
         PlayerPrefs.Save();
         OnGemsChanged?.Invoke(Gems);
-        _ = PlayerDataService.SaveCurrencyAsync(Gems, Coins);
+        _ = PlayerDataService.SaveCurrencyAsync(Gems);
         Debug.Log($"[CurrencyManager] -{amount} Gems → รวม {Gems}");
         return true;
     }
 
-    public void AddCoins(int amount)
-    {
-        if (amount <= 0) return;
-        PlayerPrefs.SetInt(COINS_KEY, Coins + amount);
-        PlayerPrefs.Save();
-        OnCoinsChanged?.Invoke(Coins);
-        _ = PlayerDataService.SaveCurrencyAsync(Gems, Coins);
-    }
-
     /// <summary>
-    /// เรียกตอนจบเกม — บันทึก Coin จากเกมและ Gem reward
+    /// เรียกตอนจบเกม — บันทึก Gem reward
     /// </summary>
-    public void SaveEndGameRewards(int earnedCoins, int earnedGems)
+    public void SaveEndGameRewards(int earnedGems)
     {
-        AddCoins(earnedCoins);
         AddGems(earnedGems);
-        Debug.Log($"[CurrencyManager] รางวัลจบเกม: +{earnedCoins} Coins, +{earnedGems} Gems");
+        Debug.Log($"[CurrencyManager] รางวัลจบเกม: +{earnedGems} Gems");
     }
 
     /// <summary>
@@ -112,8 +99,7 @@ public class CurrencyManager : MonoBehaviour
     public void RefreshFromLocalCache()
     {
         OnGemsChanged?.Invoke(Gems);
-        OnCoinsChanged?.Invoke(Coins);
-        Debug.Log($"[CurrencyManager] Refreshed from local cache. Gems: {Gems}, Coins: {Coins}");
+        Debug.Log($"[CurrencyManager] Refreshed from local cache. Gems: {Gems}");
     }
 
     /// <summary>

@@ -64,7 +64,7 @@ public static class ShopManager
             PlayerPrefs.Save();
             
             // บันทึกลง Database ด้วย (ถ้าล็อกอินอยู่)
-            _ = PlayerDataService.SaveCurrencyAsync(newTotal, PlayerPrefs.GetInt("TotalCoins", 0));
+            _ = PlayerDataService.SaveCurrencyAsync(newTotal);
             
             Debug.LogWarning("[Shop] CurrencyManager missing, used PlayerPrefs gems. Synced to Database.");
         }

@@ -1,0 +1,1320 @@
+Total pages: 60
+
+=== SCANNING FIRST 15 PAGES ===
+
+--- PAGE 1 (Length: 1801) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+ 
+ 
+  การออกแบบและพัฒนาเว็บไซต4อีคอมเมิร4ซ Supply Go  
+Design and Development of the Supply Go E-commerce Website 
+รัชพล ประดุจพันธุ71, ธีรภัทร7 สิทธิประเสริฐ2 และพีรญา ธภัทรสุวรรณ3 
+1 ratchapon.pra@ku.th, 2 teerapat.sitt@ku.th, 3 peeraya.t@ku.th 
+ 
+1. ที่มาและความสำคัญ  
+ 
+ในปqจจุบันสินค$าที่เปsนนิยมบนแพลตฟอร7มออนไลน7มักจะมีราคาที่แพงและเมื่อต$องการซื้อสินค$าเดิมเปsนจำนวนหลายๆชิ้นเพื่อ
+นำไปขายตzอจะทำให$มีราคาต$นทุนที่สูงขึ้นกวzาเดิมทำให$ราคาขายปลีกสูงขึ้นตามและเมื่อกระแสนิยมของสินค$านั้นได$ลดลงไปจึงเกิดการ 
+ทำให$สินค$าค$างสต็อกและเกิดการจมทุนของพzอค$ารายยzอยที่ลงทุนซื้อเพื่อนำสินค$าไปขายตzอ ทางผู$จัดทำจึงได$พัฒนาเว็บไซต7 
+อีคอมเมิร7ชเว็บไซต7จะเข$ามาชzวยในการสั่งซื้อสินค$าโดยที่ไมzต$องซื้อสินค$าเดิมหลายชิ้นแตzสามารถผสมสินค$าหลายชนิดจากร$านค$าเดียว 
+กันเพื่อให$ได$ราคาสzงของสินค$าจากร$านค$าและเว็บไซต7ยังมีระบบที่สามารถชวนผู$ที่สนใจสินค$าชนิดเดียวกันมาซื้อรวมกันเปsนยอดจำนวน
+หลายชิ้นเพื่อให$ได$สินค$าที่ต$องการและมีราคาสินค$าที่ถูกลง 
+ 
+ 
+2. วัตถุประสงค9  
+ 
+2.1 เพื่อเพิ่มอิสระในการสั่งซื้อชนิดสินค$าหลากหลายรูปแบบ 
+ 
+2.2 เพื่อให$ลูกค$าได$สินค$าที่มีราคาถูก 
+ 
+2.3 เพื่อเสริมสร$างอาชีพให$แกzพzอค$าแมzค$า 
+ 
+3.) ขอบเขตของโครงงาน  
+การพัฒนาระบบซื้อขายสินค$า มีผู$ใช$งานระบบ 3 ระดับ และมีขอบเขตการทำงานดังนี้ 
+ 
+3.1) ผู(ใช(งาน 
+ 
+3.1.1 สามารถเข$าใช$เว็บไซต7ได$ 
+ 
+3.1.2 สามารถใช$งานและสั่งซื้อสินค$าภายในเว็บไซต7ได$  
+3.2) ผู(ใช(ขายสินค(า 
+ 
+3.2.1 สามารถเข$าใช$เว็บไซต7ได$ 
+ 
+3.2.2 สามารถลงขายสินค$าของเองได$ 
+3.3) ผู(ดูแลระบบ  
+ 
+3.3.1 สามารถเข$าใช$เว็บไซต7ได$ 
+ 
+3.3.2 สามารถตรวจสอบประเภทของสินค$าที่จำหนzายในแอปพลิเคชั่น 
+ 
+3.3.3 สามารถเพิ่มประเภทสินค$าได$ 
+ 
+3.3.4 สามารถอนุมัติการถอนพอยท7 
+ 
+
+--- PAGE 2 (Length: 1695) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+2 
+ 
+4.) ทบทวนวรรณกรรม  
+ 
+ 4.1 ศึกษาข(อมูลของโครงการที่เกี่ยวข(อง 
+ 
+ระบบการซื้อขายออนไลน7ของ Shopee 
+Shopee เปsนแพลตฟอร7มอีคอมเมิร7ซที่ให$บริการซื้อขายสินค$าออนไลน7ผzานอินเทอร7เน็ต 
+โดยมีการพัฒนาแอปพลิเคชันและเว็บไซต7ที่รองรับการซื้อขายสินค$าจากทั้งบุคคลทั่วไปและร$านค$าทางการ ระบบของ Shopee 
+มีคุณสมบัติหลักดังนี้Marketplace ที่เปsนมิตรกับผู$ใช$: Shopee ใช$ระบบ C2C และ 
+B2Cที่ทำให$บุคคลทั่วไปและร$านค$าเป†ดร$านขายของได$งzายผzานแพลตฟอร7มโปรโมชั่นและการตลาด: Shopee มีแคมเปญลดราคาตzาง ๆ 
+เชzน 9.9, 11.11และ 12.12 รวมถึงโค$ดสzวนลดและระบบ FlashSaleระบบชำระเงินและการขนสzง: Shopee รองรับระบบ 
+ShopeePayและให$บริการขนสzงผzาน Shopee Express และพันธมิตรขนสzงอื่นๆฟ<เจอร7 Group Buy (บางประเทศ): Shopee 
+มีระบบให$ลูกค$ารวมตัวกันเพื่อซื้อสินค$าในราคาถูกลงแม$วzาจะยังไมzได$เปsนจุดขายหลักของแพลตฟอร7ม 
+ 
+ภาพที่ 1 เว็บไซต7ซื้อขายของ Shopee 
+ 
+ 
+ระบบการซื้อขายแบบ Group Buying ของ Pinduoduo 
+Pinduoduo เปsนแพลตฟอร7มอีคอมเมิร7ซที่เติบโตอยzางรวดเร็วในประเทศจีน โดยมีจุดเดzนที่ Group Buying (การซื้อเปsนกลุzม) 
+เปsนฟ<เจอร7หลักของระบบโมเดลการซื้อขายแบบกลุzม: Pinduoduo ให$ผู$ใช$สามารถรวมกลุzมกับเพื่อนหรือคนอื่น ๆ 
+ที่สนใจสินค$าชนิดเดียวกันเพื่อรับสzวนลดเพิ่มเติมSocial Commerce: ระบบของ Pinduoduo เชื่อมตzอกับ WeChat 
+ทำให$สามารถแชร7ลิงก7สินค$ากับเพื่อนเพื่อชวนกันซื้อ และได$รับราคาพิเศษระบบ AI และ Big Data: 
+ใช$ระบบแนะนำสินค$าตามพฤติกรรมของผู$ใช$ และเสนอโปรโมชั่นที่เหมาะสมกับแตzละบุคคลกลยุทธ7ด$านราคา: เนื่องจาก Pinduoduo 
+เชื่อมโยงผู$ซื้อกับผู$ผลิตโดยตรง จึงสามารถลดต$นทุนและเสนอราคาสินค$าที่ต่ำกวzาคูzแขzง 
+
+--- PAGE 3 (Length: 867) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+3 
+ 
+ 
+ 
+ภาพที่ 2 เว็บไซต7ซื้อขายของ Pinduoduo 
+ 
+4.2 เครื่องมือที่ใช$ในการพัฒนาระบบ 
+4.2.4 React.js  
+ไลบรารีสำหรับสร$าง UI ที่ชzวยจัดการ State และ Component ให$เปsนระบบ 
+4.2.5 Next.js  
+เฟรมเวิร7กที่ชzวยเพิ่มความสามารถของ React เชzน Server-side Rendering และ Static Site Generation 
+4.2.6 Tailwind CSS 
+CSS Framework ที่ชzวยให$การออกแบบ UI รวดเร็วขึ้นโดยใช$ Utility-ﬁrst CSS 
+ 
+4.2.7 Postgresql 
+ระบบ Database สำหรับจัดเก็บข$อมูลบนเว็บไซต7 
+4.2.8 Node.js  
+รันไทม7สำหรับ JavaScript ที่ใช$สำหรับพัฒนาเซิร7ฟเวอร7 
+4.2.9 Express.js 
+ เฟรมเวิร7กสำหรับสร$าง REST API ที่ใช$งานงzาย 
+4.2.10 Stripe   
+เปsนแพลตฟอร7มชำระเงินซึ่งสามารถรองรับการขยายระบบในอนาคตได$ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 4 (Length: 1374) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+4 
+ 
+5.) แผนการดำเนินงาน 
+ 
+5.1) ระเบียบวิธีวิจัย (Research Methodology) 
+ 
+ 
+5.1.1) การเก็บรวบข$อมูล 
+รวบรวมที่ข้อมูลเกี่ยวข$องกับเว็บไซต7อีคอมเมิร7ซและเทคโนโลยีที่ใช$บนเว็บไซต7 
+ 
+ 
+ 
+ 
+5.1.1.1 ศึกษาเว็บไซต7ต$นแบบเกี่ยวกับฟ<เจอร7ที่ต$องการพัฒนา 
+ 
+ 
+5.1.2) การออกแบบฐานข$อมูล (Database Design) 
+ 
+ 
+5.1.2.1 การออกแบบฐานข$อมูลสำหรับระบบเว็บไซด7อีคอมเมิร7ซ 
+จะครอบคลุมถึงผู$ใช$งานหลายประเภทเชzน ผู$ซื้อ (Buyer), ผู$ขาย (Seller), และผู$ดูแลระบบ (Admin) 
+เพื่อให$สามารถจัดการข$อมูลหลัก เชzน จัดการบัญชีผู$ใช$ (Manage user accounts) ,  จัดการสินค$าในระบบ (Manage 
+Products), จัดการบัญชีผู$ใช$ (Manage User Accounts), รีวิวสินค$า (Review) ได$อยzางมีประสิทธิภาพ 
+ 
+ 
+ตารางที่ 1. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+user_id 
+INT  
+รหัสสมาชิก 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+username 
+TEXT 
+ชื่อผู$ใช$ 
+NOT NULL 
+ 
+ 
+email 
+TEXT 
+อีเมล7 
+UNIQUE NOT NULL 
+ 
+ 
+password 
+TEXT (hash) รหัสผzาน 
+NOT NULL 
+ 
+ 
+registration_date TIMESTAMP  วันสมัครสมาชิก 
+DEFAULT 
+CURRENT_TIMESTAMP 
+ 
+ 
+account_status 
+TEXT  
+สถานะบัญชี 
+NOT NULL 
+ 
+ 
+role 
+TEXT 
+บทบาทสมาชิก 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 5 (Length: 1308) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+5 
+ 
+ตารางที่ 2. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลเลข OTP สมัครสมาชิกของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+id_otp 
+INT  
+รหัสลำดับ OTP 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+user_id 
+INT  
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (Users.user_id) 
+otp_number 
+TEXT 
+เลข OTP 
+NOT NULL 
+ 
+ 
+create_time 
+TIMESTAMP เวลาที่สร$าง 
+NOT NULL 
+ 
+ 
+ 
+ตารางที่ 3. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลที่อยู8ของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+address_id 
+INT  
+รหัสลำดับ OTP 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+user_id 
+INT  
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (Users.user_id) 
+firstname 
+TEXT 
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+ 
+lastname  
+TEXT 
+เลข OTP 
+NOT NULL 
+ 
+ 
+phone_number  TEXT 
+เวลาที่สร$าง 
+NOT NULL 
+ 
+ 
+house_number  
+TEXT 
+เวลาหมดอายุ 
+NOT NULL 
+ 
+ 
+street  
+TEXT 
+ถนน 
+ 
+ 
+ 
+sub_district  
+TEXT 
+ตำบล 
+NOT NULL 
+ 
+ 
+district  
+TEXT 
+อำเภอ 
+NOT NULL 
+ 
+ 
+province  
+TEXT 
+จังหวัด 
+NOT NULL 
+ 
+ 
+postal_code  
+TEXT 
+รหัสไปรษณีย7 
+NOT NULL 
+ 
+ 
+address_type  
+TEXT 
+ประเภทที่อยูz 
+NOT NULL 
+ 
+ 
+
+--- PAGE 6 (Length: 1000) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+6 
+ 
+ 
+ตารางที่ 4. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลของร>านค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+shop_id  
+INT  
+รหัสร$านค$า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+user_id 
+INT  
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (users.user_id) 
+shop_name 
+TEXT 
+ชื่อร$านค$า 
+NOT NULL 
+ 
+ 
+address_id  
+INT  
+รหัสที่อยูz 
+NOT NULL 
+ 
+FK (Address.Address_id) 
+ 
+ตารางที่ 5. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมประเภทของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+category_id 
+INT  
+รหัสประเภท 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+category_name 
+TEXT  
+ชื่อประเภท 
+NOT NULL 
+ 
+ 
+description  
+TEXT  
+รายละเอียด 
+NOT NULL 
+ 
+ 
+user_id 
+INT 
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (users.user_id) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 7 (Length: 843) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+7 
+ 
+ตารางที่ 6. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลของข>อมูลสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+product_id 
+INT  
+รหัสสินค$า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+product_name 
+TEXT 
+ชื่อสินค$า 
+NOT NULL 
+ 
+ 
+product_ 
+description 
+TEXT 
+รายละเอียด 
+NOT NULL 
+ 
+ 
+price  
+NUMERIC 
+10, 2) 
+ราคา 
+NOT NULL 
+ 
+ 
+category_id 
+INT  
+รหัสประเภท 
+สินค$า 
+NOT NULL 
+ 
+FK 
+(category.category.id) 
+status 
+TEXT 
+สถานะสินค$า 
+NOT NULL 
+ 
+ 
+created_date 
+DateTime 
+วันที่เพิ่มสินค$า 
+NOT NULL 
+ 
+ 
+updated_date 
+DateTime 
+วันที่อัปเดตสินค$า 
+NOT NULL 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 8 (Length: 1094) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+8 
+ 
+ตารางที่ 7. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลล็อตของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+batch_id 
+INT  
+รหัสล็อตสินค$า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+product_id  
+INT  
+รหัสสินค$า 
+NOT NULL 
+ 
+FK 
+(product. 
+product_id) 
+batch_number  
+TEXT 
+เลขล็อตสินค$า 
+NOT NULL 
+ 
+ 
+manufactured 
+_date  
+DATE 
+วันที่ผลิต 
+NOT NULL 
+ 
+ 
+expiry_date  
+DATE 
+วันหมดอายุ 
+ 
+ 
+ 
+variant_id  
+INT 
+รหัสรุzนยzอย 
+ 
+ 
+FK (Product_ 
+variants. 
+variant_id) 
+quantity  
+INT  
+จำนวนชิ้น 
+NOT NULL 
+ 
+ 
+ 
+ 
+ 
+ 
+ตารางที่ 8. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลเจ>าของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+product_owners
+_id 
+INT 
+รหัสหลัก 
+NOT NULL 
+ 
+ 
+shop_id  
+INT 
+รหัสร$านค$า 
+NOT NULL 
+ 
+FK (shops.shop_id) 
+product_id 
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK(products. 
+product_id ) 
+ 
+
+--- PAGE 9 (Length: 1033) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+9 
+ 
+ตารางที่ 9. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลรูปภาพของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+product_images 
+_id 
+INT 
+รหัสแถวของรูปสิ
+นค$า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+product_id  
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK ( products. 
+product_id ) 
+image_url  
+TEXT 
+URL ของรูปสินค$า NOT NULL 
+ 
+ 
+is_primary  
+BOOLEAN 
+ระบุวzารูปนี้เปsนรูป
+หลักหรือไมz 
+TRUE / FALSE 
+ 
+ 
+sort_order 
+INT 
+ลำดับการแสดงรูป  
+ 
+ 
+ 
+ตารางที่ 10. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลตัวเลือกของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+option_id 
+INT 
+รหัสตัวเลือกของสิ
+นค$า 
+GENERATED ALWAYS AS 
+IDENTITY 
+ 
+ 
+name  
+TEXT 
+ชื่อตัวเลือก 
+ 
+ 
+ 
+product_id 
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK 
+(products.product_id ) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 10 (Length: 1067) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+10 
+ 
+ตารางที่ 11. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลรูปแบบของสินค>า 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+variant_id 
+INT 
+รหัสตัวเลือกของสิ
+นค$า 
+GENERATED ALWAYS AS 
+IDENTITY 
+PK 
+ 
+product_id  
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK (products. 
+product_id ) 
+sku 
+ 
+TEXT 
+รหัส SKU ของ 
+Variant 
+NOT NULL 
+ 
+ 
+price 
+NUMERIC 
+(10,2) 
+ราคาของ Variant  
+ 
+ 
+ 
+ตารางที่ 12. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลค8าตัวเลือกแต8ละรูปแบบของสินค>า 
+Element 
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+variant_option_ 
+id 
+INT 
+รหัสตัวเลือกของสิ
+นค$า 
+GENERATED ALWAYS AS 
+IDENTITY 
+PK 
+ 
+variant_id  
+INT 
+รหัส Variant 
+NOT NULL 
+ 
+FK (product_ 
+variants.variant_id ) 
+option_id 
+ 
+INT 
+รหัสตัวเลือกสินค$า NOT NULL 
+ 
+FK (product_ 
+options.option_id) 
+value 
+TEXT 
+คzาของตัวเลือก 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 11 (Length: 995) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+11 
+ 
+ตารางที่ 13. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมตะกร>าสินค>าของผู>ใช> 
+Element 
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+cart_id  
+INT  
+รหัสตะกร$า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+user_id  
+INT  
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (users.user_id) 
+create_at  
+TIMESTAMP วันที่สร$าง 
+NOT NULL 
+ 
+ 
+update_at  
+TIMESTAMP เวลาอัปเดตสินค$า NOT NULL 
+ 
+ 
+ 
+ตารางที่ 14. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลสินค>าภายในตะกร>าที่มีตัวเลือกย8อยของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+cart_item_id 
+INT 
+รหัสสินค$าใน 
+ตะกร$า 
+NOT NULL 
+ 
+FK (cart_items. 
+cart_item_id) 
+variant_option_ 
+id  
+INT 
+ตัวเลือกของคุณ 
+สมบัติสินค$า 
+NOT NULL 
+ 
+FK(variant_ 
+options.variant_option
+_id) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 12 (Length: 842) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+12 
+ 
+ตารางที่ 15. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลสินค>าภายในตะกร>าของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+cart_item_id 
+INT 
+รหัสสินค$าในตะกร$
+า 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+cart_id  
+INT 
+รหัสตะกร$า 
+NOT NULL 
+ 
+FK 
+(cart.cart_id) 
+product_id 
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK 
+(product. 
+product_id) 
+shop_id  
+INT 
+รหัสร$านค$า 
+NOT NULL 
+ 
+FK 
+(shop.shop_id) 
+quantity  
+INT 
+จำนวนชิ้น 
+NOT NULL 
+ 
+ 
+price_per_unit  
+NUMERIC 
+(10, 2) 
+ราคาตzอชิ้น 
+NOT NULL 
+ 
+ 
+variant_id 
+INT 
+รหัสรุzนยzอย 
+ 
+ 
+FK(product_variants. 
+variant_id) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 13 (Length: 1384) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+13 
+ 
+ตาราง 16. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลคำสั่งซื้อของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+order_id  
+INT 
+รหัสคำสั่งซื้อ 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+address_id  
+INT 
+รหัสที่อยูz 
+NOT NULL 
+ 
+FK (Address.Address_id) 
+user_id  
+INT 
+รหัสผู$ใช$ 
+NOT NULL 
+ 
+FK (users.user_id) 
+order_date  
+TIMESTAMP วันที่คำสั่งซื้อสร$าง NOT NULL 
+ 
+ 
+total_amount 
+NUMERIC 
+(10, 2) 
+ราคารวม 
+NOT NULL 
+ 
+ 
+status  
+TEXT 
+สถานะคำสั่งซื้อ 
+NOT NULL 
+ 
+ 
+ 
+ตารางที่ 17. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลสินค>าภายในคำสั่งซื้อของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+order_item_id 
+INT 
+รหัสสินค$าในคำสั่ง
+ซื้อ 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+order_shop_id  
+INT 
+รหัสคำสั่งซื้อร$านค$
+า 
+NOT NULL 
+ 
+FK (order_shops. 
+order_shop_id) 
+product_id 
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK(product.product_id) 
+variant_option_ 
+id 
+INT 
+รหัสเฉพาะตัวเลือ
+กยzอย 
+ 
+ 
+FK(variant_options.vari
+ant_option_id) 
+quantity 
+INT 
+จำนวน 
+NOT NULL 
+ 
+ 
+price_per_unit 
+NUMERIC 
+(10, 2) 
+ราคาตzอชิ้น 
+NOT NULL 
+ 
+ 
+total_price 
+NUMERIC 
+(10, 2) 
+ราคารวม 
+NOT NULL 
+ 
+ 
+
+--- PAGE 14 (Length: 874) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+14 
+ 
+ตารางที่ 18. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลร>านค>าภายในคำสั่งซื้อของผู>ใช> 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+order_shop_id 
+INT 
+รหัสแถว 
+order_shops 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+order_id  
+INT 
+รหัสคำสั่งซื้อหลัก 
+NOT NULL 
+ 
+FK (order_shops. 
+order_shop_id) 
+shop_id 
+INT 
+รหัสร$านค$า 
+NOT NULL 
+ 
+FK 
+shops.shop_id 
+subtotal 
+NUMERIC 
+(10,2) 
+ 
+ยอดรวมของร$าน 
+ 
+ 
+FK(variant_ 
+options.variant_option
+_id) 
+status 
+TEXT 
+จำนวน 
+NOT NULL 
+ 
+ 
+tracking_number TEXT 
+ราคาตzอชิ้น 
+ 
+ 
+ 
+charge_id 
+TEXT 
+ราคารวม 
+NOT NULL 
+ 
+ 
+transaction_id 
+TEXT 
+ 
+NOT NULL 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 15 (Length: 1236) ---
+ 
+ 
+แบบข$อเสนอโครงการ โครงงานวิทยาการคอมพิวเตอร7 ประจำป<การศึกษา 2568 
+หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร7  
+คณะศิลปศาสตร7และวิทยาศาสตร7 มหาวิทยาลัยเกษตรศาสตร7 วิทยาเขตกำแพงแสน 
+ 
+15 
+ 
+ตารางที่ 19. ตารางพจนานุกรมของแหล8งจัดเก็บข>อมูลแฟAมข>อมูลกลุ8มซื้อร8วม 
+Element  
+Name 
+Data 
+Type 
+Description 
+Permissible Value 
+key 
+Type 
+FK 
+group_buying_id INT 
+รหัสกลุzมซื้อ 
+GENERATED ALWAYS AS 
+IDENTITY PRIMARY KEY 
+PK 
+ 
+shop_id 
+INT 
+รหัสร$านค$าเจ$าขอ
+งกลุzม 
+NOT NULL 
+ 
+FK 
+(shop.shop_id) 
+product_id 
+INT 
+รหัสสินค$า 
+NOT NULL 
+ 
+FK (products. 
+product_id) 
+variant_id  
+INT 
+รหัส Variant 
+ของสินค$า 
+ 
+ 
+FK (product_ 
+variants.variant_id) 
+required_ 
+members 
+INT 
+จำนวนสมาชิกขั้น
+ต่ำ 
+ 
+ 
+ 
+total_items  
+INT 
+สินค$าทั้งหมด 
+ 
+ 
+ 
+status  
+TEXT 
+สถานะกลุzม 
+"open", "closed" 
+ 
+ 
+point_per_group  INT 
+แต$มรวมของกลุzม 
+Default: 0 
+ 
+ 
+points_per_ 
+member  
+INT 
+แต$มตzอสมาชิก 
+Default: 0 
+ 
+ 
+created_at  
+TIMESTAMP วันที่สร$างกลุzม 
+Default: now() 
+ 
+ 
+updated_at  
+TEXT 
+วันที่อัปเดตลzาสุด 
+Default: now(),  
+ 
+ 
+group_name 
+TEXT 
+ชื่อกลุzม 
+NOT NULL 
+ 
+ 
+description 
+TEXT 
+คำอธิบายกลุzม 
+NOT NULL 
+ 
+ 
+expire_at 
+TIMESTAMP วันที่หมดอายุ 
+NOT NULL 
+ 
+ 
+items_per_ 
+member 
+INT 
+จำนวนตzอสมาชิก 
+Default: 0 
+ 
+ 
+ 
+
+=== SEARCHING FOR CHAPTERS ===

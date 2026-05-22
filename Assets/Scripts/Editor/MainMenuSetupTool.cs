@@ -16,21 +16,10 @@ public class MainMenuSetupTool
             return;
         }
 
-        // Add Gem Text
+        // totalCoinsText was removed. Gem Text should be set up manually or exist already.
         if (modeSelect.totalGemsText == null)
         {
-            GameObject coinTextObj = modeSelect.totalCoinsText != null ? modeSelect.totalCoinsText.gameObject : null;
-            if (coinTextObj != null)
-            {
-                GameObject gemTextObj = Object.Instantiate(coinTextObj, coinTextObj.transform.parent);
-                gemTextObj.name = "TotalGemsText";
-                RectTransform rect = gemTextObj.GetComponent<RectTransform>();
-                rect.anchoredPosition += new Vector2(0, -60); // Shift down
-                TextMeshProUGUI tmp = gemTextObj.GetComponent<TextMeshProUGUI>();
-                tmp.color = Color.cyan;
-                tmp.text = "Gems: 0";
-                modeSelect.totalGemsText = tmp;
-            }
+            Debug.LogWarning("totalGemsText is null on ModeSelectUI. Please assign it manually.");
         }
 
         // Add Shop Button

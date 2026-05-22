@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Startup City — Quiz Patch Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Bai+Jamjuree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root {
+      --primary:   #00f3ff;
+      --secondary: #bc13fe;
+      --accent:    #ff00ff;
+      --green:     #00ff88;
+      --red:       #ff3366;
+      --yellow:    #ffd700;
+      --bg:        #050811;
+      --surface:   #0b1120;
+      --card:      rgba(15, 23, 42, 0.85);
+      --border:    rgba(0, 243, 255, 0.18);
+      --border2:   rgba(188, 19, 254, 0.18);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Bai Jamjuree', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 15% 10%, rgba(0,243,255,.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 90%, rgba(188,19,254,.08) 0%, transparent 50%);
+    }
+
+    /* ── Particles ── */
+    #particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    /* ── Layout ── */
+    .layout { position: relative; z-index: 1; display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      background: rgba(11,17,32,.95);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 0;
+      position: sticky; top: 0; height: 100vh;
+      backdrop-filter: blur(20px);
+    }
+    .sidebar-logo {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo .game-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px; font-weight: 900;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+    }
+    .sidebar-logo .panel-label {
+      font-size: 10px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 2px; margin-top: 4px;
+    }
+    .nav-section { padding: 16px 12px 8px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; margin: 2px 8px;
+      border-radius: 10px; cursor: pointer;
+      font-size: 13px; color: var(--muted);
+      transition: all .2s ease; user-select: none;
+    }
+    .nav-item:hover { background: rgba(0,243,255,.07); color: var(--primary); }
+    .nav-item.active {
+      background: rgba(0,243,255,.12);
+      color: var(--primary);
+      border: 1px solid rgba(0,243,255,.2);
+    }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    #adminBadge {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,255,136,.06);
+      border: 1px solid rgba(0,255,136,.15);
+      font-size: 12px;
+    }
+    #adminBadge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); flex-shrink: 0; }
+    #adminBadge .info { flex: 1; min-width: 0; }
+    #adminBadge .name { font-weight: 600; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #adminBadge .role { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    #logoutBtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px; transition: color .2s; }
+    #logoutBtn:hover { color: var(--red); }
+
+    /* ── Main ── */
+    .main { padding: 32px; overflow-y: auto; }
+
+    /* ─── Page header ─── */
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 700;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .page-header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+    /* ─── Stats Bar ─── */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px 20px;
+      backdrop-filter: blur(12px);
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { font-family: 'Orbitron', sans-serif; font-size: 28px; font-weight: 700; margin-top: 6px; color: var(--primary); }
+    .stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ─── Section ─── */
+    .section { margin-bottom: 28px; }
+    .section-title {
+      font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700;
+      color: var(--primary); text-transform: uppercase; letter-spacing: 2px;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ─── Upload Zone ─── */
+    .upload-zone {
+      border: 2px dashed rgba(0,243,255,.25);
+      border-radius: 16px; padding: 36px 24px;
+      text-align: center; cursor: pointer;
+      transition: all .25s ease;
+      background: rgba(0,243,255,.02);
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(0,243,255,.06);
+    }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-title { font-size: 15px; font-weight: 600; color: var(--text); }
+    .upload-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    #selectedFileName { margin-top: 10px; font-size: 13px; color: var(--primary); min-height: 18px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 11px; color: var(--primary); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+    .form-group input, .form-group textarea {
+      background: rgba(0,0,0,.3); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 14px; color: var(--text);
+      font-family: 'Bai Jamjuree', sans-serif; font-size: 14px;
+      transition: all .2s ease; outline: none; resize: none;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      border-color: var(--primary); box-shadow: 0 0 10px rgba(0,243,255,.15);
+      background: rgba(0,0,0,.5);
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder { color: rgba(255,255,255,.18); }
+
+    /* ─── Preview table ─── */
+    #previewSection { margin-top: 18px; display: none; }
+    .preview-info { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .badge {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(0,243,255,.12); border: 1px solid rgba(0,243,255,.3); color: var(--primary);
+    }
+    .badge.green { background: rgba(0,255,136,.1); border-color: rgba(0,255,136,.3); color: var(--green); }
+    .badge.red   { background: rgba(255,51,102,.1); border-color: rgba(255,51,102,.3); color: var(--red); }
+    .badge.yellow{ background: rgba(255,215,0,.1);  border-color: rgba(255,215,0,.3);  color: var(--yellow); }
+
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: rgba(0,243,255,.06); }
+    th { padding: 10px 14px; text-align: left; font-size: 11px; color: var(--muted);
+         text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(0,243,255,.03); }
+    td.correct { color: var(--green); font-weight: 600; }
+    .q-text { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ─── Buttons ─── */
+    .btn-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .btn {
+      padding: 11px 22px; border: none; border-radius: 10px;
+      font-family: 'Bai Jamjuree', sans-serif; font-weight: 700; font-size: 13px;
+      cursor: pointer; transition: all .25s ease; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #0080ff);
+      color: #fff;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,243,255,.3); filter: brightness(1.1); }
+    .btn-danger {
+      background: rgba(255,51,102,.12); border: 1px solid rgba(255,51,102,.3); color: var(--red);
+    }
+    .btn-danger:hover { background: rgba(255,51,102,.22); transform: translateY(-1px); }
+    .btn-ghost {
+      background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--muted);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.09); color: var(--text); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+    /* ─── Patch List ─── */
+    .patch-grid { display: flex; flex-direction: column; gap: 12px; }
+    .patch-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px 20px;
+      display: flex; align-items: center; gap: 16px;
+      backdrop-filter: blur(12px);
+      transition: border-color .2s;
+    }
+    .patch-card:hover { border-color: rgba(0,243,255,.35); }
+    .patch-card.inactive { opacity: .55; border-color: var(--border2); }
+    .patch-info { flex: 1; min-width: 0; }
+    .patch-name { font-weight: 700; font-size: 15px; color: var(--text); }
+    .patch-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .patch-desc { font-size: 12px; color: #8899aa; margin-top: 4px; font-style: italic; }
+    .patch-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .toggle-btn {
+      width: 44px; height: 24px; border-radius: 12px; border: none; cursor: pointer;
+      position: relative; transition: background .2s;
+    }
+    .toggle-btn.on  { background: linear-gradient(90deg, var(--green), #00cc6a); }
+    .toggle-btn.off { background: rgba(255,255,255,.12); }
+    .toggle-btn::after {
+      content: ''; position: absolute; top: 3px; width: 18px; height: 18px;
+      background: #fff; border-radius: 50%;
+      transition: left .2s; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+    .toggle-btn.on::after  { left: 23px; }
+    .toggle-btn.off::after { left: 3px; }
+
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 8px; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all .2s;
+    }
+    .icon-btn.del { background: rgba(255,51,102,.1); color: var(--red); }
+    .icon-btn.del:hover { background: rgba(255,51,102,.25); transform: scale(1.1); }
+    .icon-btn.view { background: rgba(0,243,255,.1); color: var(--primary); }
+    .icon-btn.view:hover { background: rgba(0,243,255,.2); }
+
+    /* ─── Login Overlay ─── */
+    #loginOverlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(0,243,255,.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(188,19,254,.1) 0%, transparent 50%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-card {
+      width: 100%; max-width: 400px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 24px; padding: 40px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 30px 60px rgba(0,0,0,.5), 0 0 30px rgba(0,243,255,.08);
+      animation: slideUp .5s ease-out;
+    }
+    @keyframes slideUp { from { opacity:0; transform: translateY(30px); } to { opacity:1; transform: none; } }
+    .login-logo {
+      font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 900;
+      text-align: center; margin-bottom: 6px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .login-sub { text-align: center; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 28px; }
+
+    /* ─── Loading ─── */
+    .loading-bar {
+      height: 3px; border-radius: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      margin-bottom: 20px; display: none;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:.5;} 50%{opacity:1;} }
+
+    /* ─── Progress bar ─── */
+    .upload-progress { display: none; margin-top: 14px; }
+    .progress-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .progress-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .progress-fill  { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--secondary)); width: 0; transition: width .3s ease; }
+
+    /* ─── Empty State ─── */
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .5; }
+    .empty-text { font-size: 14px; }
+
+    /* ─── Page tabs ─── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ─── Modal Question Preview ─── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; display: none;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: #0b1120; border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px;
+      width: 100%; max-width: 700px; max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-title { font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--primary); }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+    .modal-close:hover { color: var(--red); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,243,255,.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,243,255,.4); }
+
+    /* swal */
+    .swal2-popup { background: #0f172a !important; border: 1px solid var(--border) !important; border-radius: 20px !important; font-family: 'Bai Jamjuree', sans-serif !important; }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 16px; }
+      .stats-row { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="particles"></div>
+
+  <!-- ─── Login Overlay ─── -->
+  <div id="loginOverlay">
+    <div class="login-card">
+      <div class="login-logo">STARTUP CITY</div>
+      <div class="login-sub">Quiz Admin Panel</div>
+      <div class="loading-bar" id="loginLoadingBar"></div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Admin Email</label>
+        <input type="email" id="loginEmail" placeholder="admin@example.com">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary" id="loginBtn" style="width:100%;justify-content:center">
+        🔐 เข้าสู่ระบบ Admin
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Main Layout ─── -->
+  <div class="layout" id="mainLayout" style="display:none">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="game-title">STARTUP CITY</div>
+        <div class="panel-label">Quiz Admin Panel</div>
+      </div>
+      <div class="nav-section">เมนูหลัก</div>
+      <div class="nav-item active" data-page="patches" id="navPatches">
+        <span class="nav-icon">📦</span> Patch Library
+      </div>
+      <div class="nav-item" data-page="upload" id="navUpload">
+        <span class="nav-icon">⬆️</span> อัปโหลด Patch ใหม่
+      </div>
+      <div class="nav-section">ข้อมูล</div>
+      <div class="nav-item" data-page="guide" id="navGuide">
+        <span class="nav-icon">📋</span> รูปแบบไฟล์ JSON
+      </div>
+      <div class="sidebar-footer">
+        <div id="adminBadge">
+          <div class="dot"></div>
+          <div class="info">
+            <div class="name" id="adminName">—</div>
+            <div class="role">Administrator</div>
+          </div>
+          <button class="icon-btn" id="logoutBtn" title="ออกจากระบบ">⏏️</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- ─── Page: Patches ─── -->
+      <div class="page active" id="pagePatches">
+        <div class="page-header">
+          <h1>📦 Patch Library</h1>
+          <p>จัดการ patch คำถามทั้งหมด — เปิด/ปิด หรือลบ patch ได้จากที่นี้</p>
+        </div>
+
+        <div class="stats-row" id="statsRow">
+          <div class="stat-card">
+            <div class="stat-label">Total Patches</div>
+            <div class="stat-value" id="statPatches">—</div>
+            <div class="stat-sub">ทุก patch</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Patches</div>
+            <div class="stat-value" id="statActive" style="color:var(--green)">—</div>
+            <div class="stat-sub">ใช้งานอยู่</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Questions</div>
+            <div class="stat-value" id="statQuestions" style="color:var(--secondary)">—</div>
+            <div class="stat-sub">คำถามในคลัง (active)</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">รายการ Patch</div>
+          <div class="loading-bar" id="patchLoadingBar" style="display:none;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--primary),var(--secondary));margin-bottom:16px;animation:pulse 1.5s ease-in-out infinite"></div>
+          <div class="patch-grid" id="patchList">
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <div class="empty-text">กำลังโหลด...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Page: Upload ─── -->
+      <div class="page" id="pageUpload">
+        <div class="page-header">
+          <h1>⬆️ อัปโหลด Patch ใหม่</h1>
+          <p>เลือกไฟล์ JSON คำถาม (สูงสุด 100 คำถาม/ไฟล์) แล้วตั้งชื่อ patch ก่อน import</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">เลือกไฟล์ JSON</div>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".json">
+            <div class="upload-icon">📂</div>
+            <div class="upload-title">คลิกหรือลาก JSON มาวางที่นี่</div>
+            <div class="upload-hint">รองรับเฉพาะ .json · สูงสุด 100 คำถาม / ไฟล์</div>
+            <div id="selectedFileName"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ชื่อ Patch *</label>
+              <input type="text" id="patchName" placeholder="เช่น Pack 1 - ความรู้ทั่วไป">
+            </div>
+            <div class="form-group">
+              <label>คำอธิบาย (ไม่บังคับ)</label>
+              <input type="text" id="patchDesc" placeholder="เช่น คำถามง่าย หมวดวิทย์-คณิต">
+            </div>
+          </div>
+
+          <div class="upload-progress" id="uploadProgress">
+            <div class="progress-label" id="progressLabel">กำลัง import...</div>
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" id="previewBtn" disabled>👁 Preview คำถาม</button>
+            <button class="btn btn-primary" id="importBtn" disabled>⚡ Import Patch</button>
+            <button class="btn btn-ghost" id="clearFileBtn">🗑 ล้าง</button>
+          </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div id="previewSection">
+          <div class="section">
+            <div class="section-title">Preview คำถาม</div>
+            <div class="preview-info" id="previewInfo"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>คำถาม</th>
+                    <th>หมวด</th>
+                    <th>ระดับ</th>
+                    <th>ตัวเลือก</th>
+                    <th>เฉลย</th>
+                  </tr>
+                </thead>
+                <tbody id="previewBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Page: Guide ─── -->
+      <div class="page" id="pageGuide">
+        <div class="page-header">
+          <h1>📋 รูปแบบไฟล์ JSON</h1>
+          <p>ไฟล์ JSON ต้องมี structure ตามรูปแบบนี้เพื่อให้ import ได้ถูกต้อง</p>
+        </div>
+        <div class="section">
+          <div class="section-title">โครงสร้างไฟล์</div>
+          <div class="table-wrap" style="padding:24px;font-family:monospace;font-size:13px;line-height:1.8;color:#a5f3fc;background:rgba(0,243,255,.03)">
+<pre>{
+  "version": "1.0",
+  "totalQuestions": 3,
+  "questions": [
+    {
+      "id": "q001",
+      "category": "วิทยาศาสตร์",
+      "difficulty": "easy",
+      "question": "น้ำมีสูตรทางเคมีว่าอะไร?",
+      "choices": ["H2O", "CO2", "NaCl", "O2"],
+      "correctIndex": 0
+    },
+    {
+      "id": "q002",
+      "category": "คณิตศาสตร์",
+      "difficulty": "medium",
+      "question": "2 + 2 × 2 = ?",
+      "choices": ["4", "6", "8", "2"],
+      "correctIndex": 1
+    }
+  ]
+}</pre>
+          </div>
+          <div style="margin-top:20px">
+            <div class="section-title">ฟิลด์ที่รองรับ</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Field</th><th>ประเภท</th><th>บังคับ</th><th>รายละเอียด</th></tr></thead>
+                <tbody>
+                  <tr><td><code>id</code></td><td>string</td><td><span class="badge">ไม่บังคับ</span></td><td>ID อ้างอิง (จะเก็บใน external_id)</td></tr>
+                  <tr><td><code>category</code></td><td>string</td><td><span class="badge">ไม่บังคับ</span></td><td>หมวดหมู่ (default: "ทั่วไป")</td></tr>
+                  <tr><td><code>difficulty</code></td><td>string</td><td><span class="badge">ไม่บังคับ</span></td><td>"easy" | "medium" | "hard" (default: "medium")</td></tr>
+                  <tr><td><code>question</code></td><td>string</td><td><span class="badge green">บังคับ</span></td><td>ข้อความคำถาม</td></tr>
+                  <tr><td><code>choices</code></td><td>string[]</td><td><span class="badge green">บังคับ</span></td><td>array 4 ตัวเลือก</td></tr>
+                  <tr><td><code>correctIndex</code></td><td>number</td><td><span class="badge green">บังคับ</span></td><td>index ตัวเลือกที่ถูก (0–3)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style="margin-top:20px">
+            <button class="btn btn-primary" id="downloadSampleBtn">⬇ ดาวน์โหลดไฟล์ตัวอย่าง</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ─── Modal: View Questions ─── -->
+  <div class="modal-overlay" id="viewModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">คำถามใน Patch</div>
+        <button class="modal-close" id="closeModal">✕</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // ────────────────────────────────
+    //  Config
+    // ────────────────────────────────
+    const SUPABASE_URL     = 'https://uwspzhwvjpkcjpoqgkhp.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3B6aHd2anBrY2pwb3Fna2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzUwMzYsImV4cCI6MjA5MDQxMTAzNn0.hgTN21pBcTD2meqXxKnydit0U7inI3OpMOAFVy9NtEE';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ────────────────────────────────
+    //  State
+    // ────────────────────────────────
+    let parsedQuestions = null;
+    let allPatches = [];
+
+    // ────────────────────────────────
+    //  Auth
+    // ────────────────────────────────
+    async function checkAuth() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        showPanel(session.user);
+      } else {
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('mainLayout').style.display = 'none';
+      }
+    }
+
+    function showPanel(user) {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('mainLayout').style.display = 'grid';
+      const email = user.email || '';
+      const name = (user.user_metadata?.username) || email.split('@')[0] || 'Admin';
+      document.getElementById('adminName').textContent = name;
+      loadPatches();
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email    = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!email || !password) return Swal.fire({ icon:'warning', title:'กรอกข้อมูลให้ครบ', confirmButtonColor:'#00f3ff' });
+
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...';
+      document.getElementById('loginLoadingBar').style.display = 'block';
+
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      document.getElementById('loginLoadingBar').style.display = 'none';
+      btn.disabled = false; btn.textContent = '🔐 เข้าสู่ระบบ Admin';
+
+      if (error) {
+        Swal.fire({ icon:'error', title:'เข้าสู่ระบบไม่สำเร็จ', text: error.message.includes('Invalid') ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message, confirmButtonColor:'#ff3366' });
+        return;
+      }
+      showPanel(data.user);
+    });
+
+    // Enter key for login
+    ['loginEmail','loginPassword'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      const r = await Swal.fire({ title:'ออกจากระบบ?', icon:'question', showCancelButton:true, confirmButtonText:'ใช่', cancelButtonText:'ยกเลิก', confirmButtonColor:'#ff3366', cancelButtonColor:'#334155' });
+      if (r.isConfirmed) { await sb.auth.signOut(); location.reload(); }
+    });
+
+    // ────────────────────────────────
+    //  Navigation
+    // ────────────────────────────────
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+        const page = item.dataset.page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page' + page.charAt(0).toUpperCase() + page.slice(1)).classList.add('active');
+        if (page === 'patches') loadPatches();
+      });
+    });
+
+    // ────────────────────────────────
+    //  Load Patches
+    // ────────────────────────────────
+    async function loadPatches() {
+      document.getElementById('patchLoadingBar').style.display = 'block';
+      const { data, error } = await sb
+        .from('quiz_patches')
+        .select('*')
+        .order('created_at', { ascending: false });
+      document.getElementById('patchLoadingBar').style.display = 'none';
+
+      if (error) { console.error(error); return; }
+      allPatches = data || [];
+      renderPatches();
+      updateStats();
+    }
+
+    function updateStats() {
+      const active = allPatches.filter(p => p.is_active);
+      document.getElementById('statPatches').textContent   = allPatches.length;
+      document.getElementById('statActive').textContent    = active.length;
+      document.getElementById('statQuestions').textContent = active.reduce((s,p) => s + (p.total_questions||0), 0);
+    }
+
+    function renderPatches() {
+      const list = document.getElementById('patchList');
+      if (!allPatches.length) {
+        list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">ยังไม่มี Patch คำถาม<br><small>ไปที่ "อัปโหลด Patch ใหม่" เพื่อเริ่มต้น</small></div></div>`;
+        return;
+      }
+      list.innerHTML = allPatches.map(p => `
+        <div class="patch-card ${p.is_active ? '' : 'inactive'}" id="pc-${p.id}">
+          <div style="font-size:28px">${p.is_active ? '📗' : '📕'}</div>
+          <div class="patch-info">
+            <div class="patch-name">${esc(p.name)}</div>
+            <div class="patch-meta">
+              <span class="badge ${p.is_active ? 'green' : 'red'}">${p.is_active ? 'Active' : 'Inactive'}</span>
+              &nbsp;<span class="badge">${p.total_questions} คำถาม</span>
+              &nbsp;<span style="font-size:11px;color:var(--muted)">สร้าง ${fmtDate(p.created_at)}</span>
+            </div>
+            ${p.description ? `<div class="patch-desc">"${esc(p.description)}"</div>` : ''}
+          </div>
+          <div class="patch-actions">
+            <button class="icon-btn view" title="ดูคำถาม" onclick="viewPatchQuestions(${p.id},'${esc(p.name)}')">👁</button>
+            <button class="toggle-btn ${p.is_active ? 'on' : 'off'}" title="${p.is_active ? 'ปิด' : 'เปิด'} patch นี้" onclick="togglePatch(${p.id},${p.is_active})"></button>
+            <button class="icon-btn del" title="ลบ patch นี้" onclick="deletePatch(${p.id},'${esc(p.name)}')">🗑</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ────────────────────────────────
+    //  Toggle Patch active
+    // ────────────────────────────────
+    async function togglePatch(id, currentActive) {
+      const newVal = !currentActive;
+      const { error } = await sb.from('quiz_patches').update({ is_active: newVal }).eq('id', id);
+      if (error) { Swal.fire({ icon:'error', title:'เกิดข้อผิดพลาด', text: error.message, confirmButtonColor:'#ff3366' }); return; }
+      const p = allPatches.find(x => x.id === id);
+      if (p) p.is_active = newVal;
+      renderPatches();
+      updateStats();
+      Swal.fire({ icon:'success', title: newVal ? '✅ เปิด Patch แล้ว' : '⏸ ปิด Patch แล้ว', timer:1500, showConfirmButton:false });
+    }
+
+    // ────────────────────────────────
+    //  Delete Patch
+    // ────────────────────────────────
+    async function deletePatch(id, name) {
+      const r = await Swal.fire({
+        title: `ลบ "${name}"?`,
+        text: 'คำถามทั้งหมดใน patch นี้จะถูกลบถาวร ไม่สามารถกู้คืนได้',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบเลย',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#ff3366',
+        cancelButtonColor: '#334155'
+      });
+      if (!r.isConfirmed) return;
+
+      const { error } = await sb.from('quiz_patches').delete().eq('id', id);
+      if (error) { Swal.fire({ icon:'error', title:'ลบไม่สำเร็จ', text: error.message, confirmButtonColor:'#ff3366' }); return; }
+      allPatches = allPatches.filter(p => p.id !== id);
+      renderPatches();
+      updateStats();
+      Swal.fire({ icon:'success', title:'ลบ Patch แล้ว', timer:1500, showConfirmButton:false });
+    }
+
+    // ────────────────────────────────
+    //  View Questions Modal
+    // ────────────────────────────────
+    async function viewPatchQuestions(patchId, patchName) {
+      document.getElementById('modalTitle').textContent = `📖 ${patchName}`;
+      document.getElementById('modalBody').innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted)">⏳ กำลังโหลด...</div>';
+      document.getElementById('viewModal').classList.add('show');
+
+      const { data, error } = await sb.from('quiz_questions').select('*').eq('patch_id', patchId).order('id');
+      if (error || !data) {
+        document.getElementById('modalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red)">โหลดไม่สำเร็จ</div>';
+        return;
+      }
+      if (!data.length) {
+        document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">ไม่มีคำถามใน Patch นี้</div></div>';
+        return;
+      }
+      document.getElementById('modalBody').innerHTML = `
+        <div style="margin-bottom:12px"><span class="badge">${data.length} คำถาม</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>คำถาม</th><th>หมวด</th><th>ระดับ</th><th>เฉลย</th></tr></thead>
+            <tbody>
+              ${data.map((q,i) => `
+                <tr>
+                  <td style="color:var(--muted)">${i+1}</td>
+                  <td class="q-text">${esc(q.question)}</td>
+                  <td><span class="badge" style="font-size:10px">${esc(q.category)}</span></td>
+                  <td>${diffBadge(q.difficulty)}</td>
+                  <td class="correct">${Array.isArray(q.choices) ? esc(q.choices[q.correct_index] || '-') : (JSON.parse(q.choices||'[]')[q.correct_index]||'-')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    document.getElementById('closeModal').addEventListener('click', () => document.getElementById('viewModal').classList.remove('show'));
+    document.getElementById('viewModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('show'); });
+
+    // ────────────────────────────────
+    //  File Upload & Parse
+    // ────────────────────────────────
+    const fileInput   = document.getElementById('fileInput');
+    const uploadZone  = document.getElementById('uploadZone');
+    const previewBtn  = document.getElementById('previewBtn');
+    const importBtn   = document.getElementById('importBtn');
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+    function handleFile(file) {
+      if (!file.name.endsWith('.json')) {
+        Swal.fire({ icon:'error', title:'รองรับเฉพาะ .json', confirmButtonColor:'#ff3366' }); return;
+      }
+      document.getElementById('selectedFileName').textContent = '📄 ' + file.name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const raw = JSON.parse(e.target.result);
+          let questions = [];
+          if (Array.isArray(raw)) { questions = raw; }
+          else if (raw.questions && Array.isArray(raw.questions)) { questions = raw.questions; }
+          else { throw new Error('ไม่พบ array คำถาม'); }
+
+          if (questions.length === 0) throw new Error('ไฟล์ไม่มีคำถาม');
+          if (questions.length > 100) {
+            Swal.fire({ icon:'warning', title:`มี ${questions.length} คำถาม`, text:'รองรับสูงสุด 100 คำถาม/ไฟล์ ระบบจะนำเฉพาะ 100 แรก', confirmButtonColor:'#ffd700' });
+            questions = questions.slice(0, 100);
+          }
+
+          // validate fields
+          const invalid = questions.filter(q => !q.question || !Array.isArray(q.choices) || q.choices.length < 2);
+          if (invalid.length) {
+            Swal.fire({ icon:'warning', title:`มี ${invalid.length} คำถามที่ข้อมูลไม่ครบ`, text:'ระบบจะข้ามคำถามที่ไม่มี question หรือ choices', confirmButtonColor:'#ffd700' });
+            questions = questions.filter(q => q.question && Array.isArray(q.choices) && q.choices.length >= 2);
+          }
+
+          parsedQuestions = questions;
+          previewBtn.disabled = false;
+          importBtn.disabled  = false;
+          Swal.fire({ icon:'success', title:`โหลด ${questions.length} คำถามสำเร็จ`, text:'กด "Preview" ดูก่อน หรือ "Import" ได้เลย', timer:2000, showConfirmButton:false });
+        } catch(err) {
+          Swal.fire({ icon:'error', title:'ไฟล์ JSON ไม่ถูกต้อง', text: err.message, confirmButtonColor:'#ff3366' });
+          parsedQuestions = null;
+          previewBtn.disabled = true;
+          importBtn.disabled  = true;
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    // ────────────────────────────────
+    //  Preview
+    // ────────────────────────────────
+    previewBtn.addEventListener('click', () => {
+      if (!parsedQuestions) return;
+      renderPreview(parsedQuestions);
+    });
+
+    function renderPreview(questions) {
+      const section = document.getElementById('previewSection');
+      section.style.display = 'block';
+
+      const cats  = [...new Set(questions.map(q => q.category || 'ทั่วไป'))];
+      const diffs = { easy:0, medium:0, hard:0 };
+      questions.forEach(q => { diffs[q.difficulty || 'medium'] = (diffs[q.difficulty||'medium']||0) + 1; });
+
+      document.getElementById('previewInfo').innerHTML = `
+        <span class="badge">${questions.length} คำถาม</span>
+        <span class="badge yellow">Easy: ${diffs.easy}</span>
+        <span class="badge">Medium: ${diffs.medium}</span>
+        <span class="badge red">Hard: ${diffs.hard}</span>
+        <span style="font-size:12px;color:var(--muted)">${cats.slice(0,5).join(', ')}${cats.length>5?'...':''}</span>
+      `;
+
+      document.getElementById('previewBody').innerHTML = questions.map((q,i) => {
+        const choices = Array.isArray(q.choices) ? q.choices : [];
+        const correct = choices[q.correctIndex ?? q.correct_index ?? 0] || '—';
+        return `<tr>
+          <td style="color:var(--muted)">${i+1}</td>
+          <td class="q-text">${esc(q.question)}</td>
+          <td><span class="badge" style="font-size:10px">${esc(q.category||'ทั่วไป')}</span></td>
+          <td>${diffBadge(q.difficulty||'medium')}</td>
+          <td style="font-size:12px;color:var(--muted)">${choices.map((c,ci) => `<span ${ci===(q.correctIndex??q.correct_index??0)?'style="color:var(--green);font-weight:700"':''}">${esc(c)}</span>`).join(' / ')}</td>
+          <td class="correct">${esc(correct)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ────────────────────────────────
+    //  Import
+    // ────────────────────────────────
+    importBtn.addEventListener('click', async () => {
+      if (!parsedQuestions) return;
+      const name = document.getElementById('patchName').value.trim();
+      const desc = document.getElementById('patchDesc').value.trim();
+      if (!name) {
+        Swal.fire({ icon:'warning', title:'กรอกชื่อ Patch ด้วย', confirmButtonColor:'#00f3ff' }); return;
+      }
+
+      importBtn.disabled = true; previewBtn.disabled = true;
+      const progressEl = document.getElementById('uploadProgress');
+      const fill = document.getElementById('progressFill');
+      const label = document.getElementById('progressLabel');
+      progressEl.style.display = 'block';
+
+      // Animate progress
+      let prog = 0;
+      const ticker = setInterval(() => {
+        prog = Math.min(prog + 2, 85);
+        fill.style.width = prog + '%';
+      }, 80);
+
+      label.textContent = `กำลัง import ${parsedQuestions.length} คำถาม...`;
+
+      // Map to DB format
+      const dbQuestions = parsedQuestions.map(q => ({
+        id:           q.id || q.external_id || '',
+        category:     q.category || 'ทั่วไป',
+        difficulty:   ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium',
+        question:     q.question,
+        choices:      q.choices,
+        correctIndex: q.correctIndex ?? q.correct_index ?? 0
+      }));
+
+      const { data, error } = await sb.rpc('import_quiz_patch', {
+        p_name:        name,
+        p_description: desc,
+        p_questions:   dbQuestions
+      });
+
+      clearInterval(ticker);
+      fill.style.width = '100%';
+
+      if (error) {
+        progressEl.style.display = 'none';
+        importBtn.disabled = false; previewBtn.disabled = false;
+        Swal.fire({ icon:'error', title:'Import ไม่สำเร็จ', text: error.message, confirmButtonColor:'#ff3366' });
+        return;
+      }
+
+      setTimeout(() => {
+        progressEl.style.display = 'none';
+        fill.style.width = '0';
+        Swal.fire({
+          icon: 'success',
+          title: '✅ Import สำเร็จ!',
+          html: `<b>${data.patch_name}</b><br>นำเข้า <b>${data.imported}</b> คำถามเรียบร้อย`,
+          confirmButtonText: 'ดู Patch Library',
+          confirmButtonColor: '#00f3ff'
+        }).then(() => {
+          clearUpload();
+          document.querySelector('[data-page="patches"]').click();
+        });
+      }, 400);
+    });
+
+    document.getElementById('clearFileBtn').addEventListener('click', clearUpload);
+    function clearUpload() {
+      fileInput.value = '';
+      document.getElementById('selectedFileName').textContent = '';
+      document.getElementById('patchName').value = '';
+      document.getElementById('patchDesc').value = '';
+      parsedQuestions = null;
+      previewBtn.disabled = true;
+      importBtn.disabled  = true;
+      document.getElementById('previewSection').style.display = 'none';
+      document.getElementById('uploadProgress').style.display = 'none';
+    }
+
+    // ────────────────────────────────
+    //  Download Sample JSON
+    // ────────────────────────────────
+    document.getElementById('downloadSampleBtn').addEventListener('click', () => {
+      const sample = {
+        version: '1.0',
+        totalQuestions: 3,
+        questions: [
+          { id:'q001', category:'วิทยาศาสตร์', difficulty:'easy', question:'น้ำมีสูตรทางเคมีว่าอะไร?', choices:['H2O','CO2','NaCl','O2'], correctIndex:0 },
+          { id:'q002', category:'คณิตศาสตร์', difficulty:'medium', question:'2 + 2 × 2 = ?', choices:['4','6','8','2'], correctIndex:1 },
+          { id:'q003', category:'ประวัติศาสตร์', difficulty:'hard', question:'กรุงเทพมหานครก่อตั้งเมื่อปี พ.ศ. ใด?', choices:['2316','2325','2350','2310'], correctIndex:1 }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(sample, null, 2)], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'quiz_sample.json';
+      a.click();
+    });
+
+    // ────────────────────────────────
+    //  Helpers
+    // ────────────────────────────────
+    function esc(str) {
+      return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('th-TH', { day:'2-digit', month:'short', year:'2-digit' });
+    }
+    function diffBadge(d) {
+      const map = { easy:'<span class="badge green" style="font-size:10px">Easy</span>', medium:'<span class="badge" style="font-size:10px">Medium</span>', hard:'<span class="badge red" style="font-size:10px">Hard</span>' };
+      return map[d] || map.medium;
+    }
+
+    // ────────────────────────────────
+    //  Particles
+    // ────────────────────────────────
+    (function particles() {
+      const c = document.getElementById('particles');
+      for (let i = 0; i < 35; i++) {
+        const el = document.createElement('div');
+        Object.assign(el.style, {
+          position: 'absolute',
+          width: (Math.random() * 2.5 + .5) + 'px',
+          borderRadius: '50%',
+          top: Math.random() * 100 + '%',
+          left: Math.random() * 100 + '%',
+          opacity: (Math.random() * .4 + .05).toString(),
+          boxShadow: `0 0 8px currentColor`
+        });
+        el.style.height = el.style.width;
+        el.style.color = Math.random() > .5 ? '#00f3ff' : '#bc13fe';
+        el.style.background = 'currentColor';
+        c.appendChild(el);
+      }
+    })();
+
+    // ────────────────────────────────
+    //  Init
+    // ────────────────────────────────
+    checkAuth();
+  </script>
+</body>
+</html>

@@ -431,7 +431,7 @@ public class DailyQuizManager : MonoBehaviour
                 PlayerPrefs.Save();
                 
                 // บันทึกลง Database ด้วย (ถ้าล็อกอินอยู่)
-                _ = PlayerDataService.SaveCurrencyAsync(newTotal, PlayerPrefs.GetInt("TotalCoins", 0));
+                _ = PlayerDataService.SaveCurrencyAsync(newTotal);
                 
                 Debug.Log($"[DailyQuiz] Added {gemReward} gems (Total: {newTotal}) to PlayerPrefs & Database (Fallback)");
             }

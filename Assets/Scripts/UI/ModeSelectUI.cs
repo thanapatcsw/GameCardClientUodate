@@ -12,8 +12,6 @@ public class ModeSelectUI : MonoBehaviour
     public GameObject lobbyPanel;
     public GameObject autoMatchPlayerCountPanel;
 
-    [Header("---- Player Stats UI ----")]
-    public TextMeshProUGUI totalCoinsText;
     public TextMeshProUGUI totalPointsText;
     public TextMeshProUGUI totalGemsText; // แสดง Gem หน้า Main Menu
     public TextMeshProUGUI usernameText;  // แสดงชื่อผู้เล่น
@@ -105,11 +103,9 @@ public class ModeSelectUI : MonoBehaviour
 
     private void RefreshStatsDisplay()
     {
-        int coins = PlayerPrefs.GetInt("TotalCoins", 0);
         int points = PlayerPrefs.GetInt("TotalPoints", 0);
         int gems = CurrencyManager.Instance != null ? CurrencyManager.Instance.Gems : PlayerPrefs.GetInt("TotalGems", 0);
 
-        if (totalCoinsText != null) totalCoinsText.text = coins.ToString();
         if (totalPointsText != null) totalPointsText.text = points.ToString();
         if (totalGemsText != null) totalGemsText.text = gems.ToString();
         
@@ -297,7 +293,7 @@ public class ModeSelectUI : MonoBehaviour
         panelImage.color = new Color(0.08f, 0.14f, 0.19f, 0.96f);
         panelImage.raycastTarget = true;
 
-        TMP_FontAsset sharedFont = characterNameText != null ? characterNameText.font : totalCoinsText != null ? totalCoinsText.font : TMP_Settings.defaultFontAsset;
+        TMP_FontAsset sharedFont = characterNameText != null ? characterNameText.font : TMP_Settings.defaultFontAsset;
         CreatePanelLabel("Select Player Count", new Vector2(0f, 126f), new Vector2(360f, 42f), 26, Color.white, sharedFont);
         CreatePlayerCountButton("2 Players", new Vector2(0f, 52f), () => OnClickAutoMatch2Players(), sharedFont);
         CreatePlayerCountButton("3 Players", new Vector2(0f, -16f), () => OnClickAutoMatch3Players(), sharedFont);

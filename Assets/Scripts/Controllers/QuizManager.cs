@@ -1,8 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.Networking;
 
 public class QuizManager : MonoBehaviour
 {
@@ -50,6 +52,13 @@ public class QuizManager : MonoBehaviour
     }
 
     public GameController gameController;
+
+    // ─── Supabase Quiz Patch Config ───────────────────────────────────────
+    // URL และ Key จะถูกกรอกอัตโนมัติ — ไม่ต้องแก้ใน Inspector
+    private const string SUPABASE_URL     = "https://uwspzhwvjpkcjpoqgkhp.supabase.co";
+    private const string SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3B6aHd2anBrY2pwb3Fna2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzUwMzYsImV4cCI6MjA5MDQxMTAzNn0.hgTN21pBcTD2meqXxKnydit0U7inI3OpMOAFVy9NtEE";
+    private const string CACHE_KEY        = "quiz_cache_v1";
+    private const int    CACHE_TTL_HOURS  = 24;  // โหลดใหม่จาก Supabase ทุก 24 ชม.
 
     [Header("---- คลังคำถาม (Quiz Database) ----")]
     public List<QuizQuestion> questionDatabase;
@@ -110,10 +119,165 @@ public class QuizManager : MonoBehaviour
         }
 
         Instance = this;
-        LoadQuizDatabaseFromJson();
         if (quizPanel != null) quizPanel.SetActive(false);
+
+        // โหลดคำถาม: ลอง Supabase ก่อน → fallback → local JSON
+        StartCoroutine(LoadQuizDatabaseHybrid());
     }
 
+    // ─── JSON Classes สำหรับ Supabase RPC response ──────────────────────
+    [System.Serializable]
+    private class SupabaseQuestion
+    {
+        public long   id;
+        public long   patch_id;
+        public string patch_name;
+        public string external_id;
+        public string category;
+        public string difficulty;
+        public string question;
+        public string[] choices;
+        public int    correct_index;
+    }
+
+    [System.Serializable]
+    private class SupabaseQuestionArray { public SupabaseQuestion[] questions; }
+
+    // ─── Hybrid Loader ───────────────────────────────────────────────────
+    private IEnumerator LoadQuizDatabaseHybrid()
+    {
+        // ขั้น 1: ลองโหลดจาก Supabase ถ้ามีเน็ต
+        bool supabaseOk = false;
+        yield return StartCoroutine(FetchFromSupabase(result => supabaseOk = result));
+
+        if (!supabaseOk)
+        {
+            Debug.LogWarning("[Quiz] Supabase unavailable — trying PlayerPrefs cache...");
+            if (!LoadFromCache())
+            {
+                Debug.LogWarning("[Quiz] Cache miss — falling back to local JSON.");
+                LoadQuizDatabaseFromJson();
+            }
+        }
+
+        if (questionDatabase == null || questionDatabase.Count == 0)
+            Debug.LogError("[Quiz] ไม่มีคำถามในคลัง! ตรวจสอบ Supabase patch หรือ quiz_database.json");
+        else
+            Debug.Log($"<color=cyan>[Quiz] Ready: {questionDatabase.Count} questions loaded.</color>");
+    }
+
+    // ─── Fetch จาก Supabase ─────────────────────────────────────────────
+    private IEnumerator FetchFromSupabase(System.Action<bool> onDone)
+    {
+        string url = SUPABASE_URL + "/rest/v1/rpc/get_active_questions";
+        using (UnityWebRequest req = new UnityWebRequest(url, "POST"))
+        {
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes("{}");
+            req.uploadHandler   = new UploadHandlerRaw(bodyRaw);
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type",  "application/json");
+            req.SetRequestHeader("apikey",         SUPABASE_ANON);
+            req.SetRequestHeader("Authorization",  "Bearer " + SUPABASE_ANON);
+
+            yield return req.SendWebRequest();
+
+            if (req.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[Quiz] Supabase fetch failed: {req.error}");
+                onDone(false);
+                yield break;
+            }
+
+            string json = req.downloadHandler.text;
+            if (string.IsNullOrEmpty(json) || json == "[]" || json == "null")
+            {
+                Debug.LogWarning("[Quiz] Supabase returned empty question list.");
+                onDone(false);
+                yield break;
+            }
+
+            // Supabase RPC คืน JSON array ตรง ๆ — wrap เพื่อ FromJson
+            string wrapped = "{\"questions\":" + json + "}";
+            SupabaseQuestionArray parsed = JsonUtility.FromJson<SupabaseQuestionArray>(wrapped);
+
+            if (parsed == null || parsed.questions == null || parsed.questions.Length == 0)
+            {
+                Debug.LogWarning("[Quiz] Supabase response parse failed.");
+                onDone(false);
+                yield break;
+            }
+
+            questionDatabase = new List<QuizQuestion>();
+            foreach (SupabaseQuestion sq in parsed.questions)
+            {
+                string[] choicesArr = sq.choices;
+                if (choicesArr == null || choicesArr.Length < 2) continue;
+
+                questionDatabase.Add(new QuizQuestion
+                {
+                    id                 = !string.IsNullOrEmpty(sq.external_id) ? sq.external_id : sq.id.ToString(),
+                    category           = sq.category,
+                    difficulty         = sq.difficulty,
+                    questionText       = sq.question,
+                    choices            = choicesArr,
+                    correctChoiceIndex = sq.correct_index
+                });
+            }
+
+            // บันทึก cache
+            PlayerPrefs.SetString(CACHE_KEY,          json);
+            PlayerPrefs.SetString(CACHE_KEY + "_ts",  System.DateTime.UtcNow.ToString("o"));
+            PlayerPrefs.Save();
+
+            Debug.Log($"<color=lime>[Quiz] Supabase: loaded {questionDatabase.Count} questions & cached.</color>");
+            onDone(true);
+        }
+    }
+
+    // ─── โหลดจาก PlayerPrefs Cache ──────────────────────────────────────
+    private bool LoadFromCache()
+    {
+        string json = PlayerPrefs.GetString(CACHE_KEY, "");
+        string ts   = PlayerPrefs.GetString(CACHE_KEY + "_ts", "");
+        if (string.IsNullOrEmpty(json)) return false;
+
+        // ตรวจ TTL
+        if (!string.IsNullOrEmpty(ts) &&
+            System.DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out System.DateTime saved))
+        {
+            if ((System.DateTime.UtcNow - saved).TotalHours > CACHE_TTL_HOURS)
+            {
+                Debug.LogWarning("[Quiz] Cache expired — will use local JSON and refresh next online session.");
+                return false;
+            }
+        }
+
+        string wrapped = "{\"questions\":" + json + "}";
+        SupabaseQuestionArray parsed = JsonUtility.FromJson<SupabaseQuestionArray>(wrapped);
+        if (parsed == null || parsed.questions == null || parsed.questions.Length == 0) return false;
+
+        questionDatabase = new List<QuizQuestion>();
+        foreach (SupabaseQuestion sq in parsed.questions)
+        {
+            string[] choicesArr = sq.choices;
+            if (choicesArr == null || choicesArr.Length < 2) continue;
+
+            questionDatabase.Add(new QuizQuestion
+            {
+                id                 = !string.IsNullOrEmpty(sq.external_id) ? sq.external_id : sq.id.ToString(),
+                category           = sq.category,
+                difficulty         = sq.difficulty,
+                questionText       = sq.question,
+                choices            = choicesArr,
+                correctChoiceIndex = sq.correct_index
+            });
+        }
+
+        Debug.Log($"<color=yellow>[Quiz] Loaded {questionDatabase.Count} questions from cache (offline).</color>");
+        return questionDatabase.Count > 0;
+    }
+
+    // ─── Local JSON Fallback (เดิม — ไม่แตะ) ────────────────────────────
     private void LoadQuizDatabaseFromJson()
     {
         TextAsset jsonFile = Resources.Load<TextAsset>("quiz_database");
@@ -135,17 +299,19 @@ public class QuizManager : MonoBehaviour
         {
             questionDatabase.Add(new QuizQuestion
             {
-                id = entry.id,
-                category = entry.category,
-                difficulty = entry.difficulty,
-                questionText = entry.question,
-                choices = entry.choices,
+                id                 = entry.id,
+                category           = entry.category,
+                difficulty         = entry.difficulty,
+                questionText       = entry.question,
+                choices            = entry.choices,
                 correctChoiceIndex = entry.correctIndex
             });
         }
 
-        Debug.Log($"<color=cyan>[Quiz] Loaded {questionDatabase.Count} questions from JSON.</color>");
+        Debug.Log($"<color=cyan>[Quiz] Loaded {questionDatabase.Count} questions from local JSON.</color>");
     }
+
+
 
 
     private void OnEnable()

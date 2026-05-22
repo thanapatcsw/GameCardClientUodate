@@ -994,12 +994,10 @@ public class GameController : MonoBehaviour
                 // --- บันทึกผ่าน CurrencyManager (ถ้ามี) หรือ fallback PlayerPrefs ---
                 if (CurrencyManager.Instance != null)
                 {
-                    CurrencyManager.Instance.SaveEndGameRewards(earnedCoins, gemReward);
+                    CurrencyManager.Instance.SaveEndGameRewards(gemReward);
                 }
                 else
                 {
-                    int currentTotalCoins = PlayerPrefs.GetInt("TotalCoins", 0);
-                    PlayerPrefs.SetInt("TotalCoins", currentTotalCoins + earnedCoins);
                     PlayerPrefs.SetInt("TotalGems",  PlayerPrefs.GetInt("TotalGems", 0) + gemReward);
                     PlayerPrefs.Save();
                 }

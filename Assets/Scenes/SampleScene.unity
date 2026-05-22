@@ -3853,19 +3853,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::QuizManager
   gameController: {fileID: 314157365}
-  questionDatabase:
-  - id: 
-    category: 
-    difficulty: 
-    questionText: "\u0E42\u0E04\u0E23\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E17\u0E35\u0E48\u0E21\u0E35\u0E25\u0E31\u0E01\u0E29\u0E13\u0E30\u0E01\u0E32\u0E23\u0E17\u0E33\u0E07\u0E32\u0E19\u0E41\u0E1A\u0E1A
-      '\u0E40\u0E02\u0E49\u0E32\u0E01\u0E48\u0E2D\u0E19 \u0E2D\u0E2D\u0E01\u0E01\u0E48\u0E2D\u0E19'
-      (First-In, First-Out: FIFO)?"
-    choices:
-    - Tree
-    - Stack
-    - Hash Table
-    - Queue
-    correctChoiceIndex: 3
+  questionDatabase: []
   quizPanel: {fileID: 112588249}
   questionText: {fileID: 1452513743}
   timerText: {fileID: 684704627}

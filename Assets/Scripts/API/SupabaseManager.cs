@@ -108,7 +108,7 @@ public class SupabaseManager : MonoBehaviour
             {
                 Debug.Log($"<color=green>✅ [Supabase] ล็อกอินสำเร็จ ยินดีต้อนรับ: {session.User.Email}</color>");
                 
-                // โหลดข้อมูลผู้เล่น (Gems, Coins, MMR) จาก Database ทันทีที่ล็อกอิน
+                // โหลดข้อมูลผู้เล่น (Gems, MMR) จาก Database ทันทีที่ล็อกอิน
                 await PlayerDataService.LoadProfileAsync();
                 
                 return (true, "");
@@ -180,7 +180,6 @@ public class SupabaseManager : MonoBehaviour
             // ไม่ใช้ DeleteAll() เพราะจะลบ settings อื่นๆ ทิ้งโดยไม่ตั้งใจ
             PlayerPrefs.DeleteKey("Username");
             PlayerPrefs.DeleteKey("TotalGems");
-            PlayerPrefs.DeleteKey("TotalCoins");
             PlayerPrefs.DeleteKey("MMR");
             PlayerPrefs.DeleteKey("OwnedItems");
             PlayerPrefs.DeleteKey("EquippedFrame");

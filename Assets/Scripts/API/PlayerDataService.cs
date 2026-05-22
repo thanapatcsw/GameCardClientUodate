@@ -48,7 +48,6 @@ public static class PlayerDataService
                 Id = sb.Auth.CurrentUser.Id,
                 Username = SupabaseManager.Instance.GetCurrentUsername(),
                 Gems = PlayerPrefs.GetInt("TotalGems", 0),
-                Coins = PlayerPrefs.GetInt("TotalCoins", 0),
                 Mmr = 1000,
                 OwnedFrames = new List<string> { "frame_default" },
                 EquippedFrame = "frame_default",
@@ -73,16 +72,14 @@ public static class PlayerDataService
         }
     }
 
-    public static async Task SaveCurrencyAsync(int gems, int coins)
+    public static async Task SaveCurrencyAsync(int gems)
     {
         PlayerPrefs.SetInt("TotalGems", gems);
-        PlayerPrefs.SetInt("TotalCoins", coins);
         PlayerPrefs.Save();
 
         if (LocalProfile != null)
         {
             LocalProfile.Gems = gems;
-            LocalProfile.Coins = coins;
         }
 
         var sb = SupabaseManager.Instance?.Client;
@@ -95,7 +92,6 @@ public static class PlayerDataService
                 Id = sb.Auth.CurrentUser.Id, 
                 Username = SupabaseManager.Instance.GetCurrentUsername(),
                 Gems = gems, 
-                Coins = coins, 
                 Mmr = LocalProfile?.Mmr ?? PlayerPrefs.GetInt("MMR", 1000),
                 Wins = LocalProfile?.Wins ?? 0,
                 Losses = LocalProfile?.Losses ?? 0,
@@ -105,7 +101,7 @@ public static class PlayerDataService
                 UpdatedAt = System.DateTime.UtcNow 
             };
             await sb.From<PlayerProfile>().Upsert(updateData);
-            Debug.Log($"[PlayerData] Currency synced: Gems={gems}, Coins={coins}");
+            Debug.Log($"[PlayerData] Currency synced: Gems={gems}");
         }
         catch (System.Exception e)
         {
@@ -135,7 +131,6 @@ public static class PlayerDataService
                 Id = sb.Auth.CurrentUser.Id, 
                 Username = SupabaseManager.Instance.GetCurrentUsername(),
                 Gems = LocalProfile?.Gems ?? PlayerPrefs.GetInt("TotalGems", 0),
-                Coins = LocalProfile?.Coins ?? PlayerPrefs.GetInt("TotalCoins", 0),
                 Mmr = LocalProfile?.Mmr ?? PlayerPrefs.GetInt("MMR", 1000),
                 Wins = LocalProfile?.Wins ?? 0,
                 Losses = LocalProfile?.Losses ?? 0,
@@ -173,7 +168,6 @@ public static class PlayerDataService
                 Id = sb.Auth.CurrentUser.Id, 
                 Username = SupabaseManager.Instance.GetCurrentUsername(),
                 Gems = LocalProfile?.Gems ?? PlayerPrefs.GetInt("TotalGems", 0),
-                Coins = LocalProfile?.Coins ?? PlayerPrefs.GetInt("TotalCoins", 0),
                 Mmr = LocalProfile?.Mmr ?? PlayerPrefs.GetInt("MMR", 1000),
                 Wins = LocalProfile?.Wins ?? 0,
                 Losses = LocalProfile?.Losses ?? 0,
@@ -216,7 +210,6 @@ public static class PlayerDataService
                 Id = sb.Auth.CurrentUser.Id, 
                 Username = SupabaseManager.Instance.GetCurrentUsername(),
                 Gems = LocalProfile?.Gems ?? PlayerPrefs.GetInt("TotalGems", 0),
-                Coins = LocalProfile?.Coins ?? PlayerPrefs.GetInt("TotalCoins", 0),
                 Mmr = newMmr, 
                 Wins = wins, 
                 Losses = losses, 
@@ -259,7 +252,6 @@ public static class PlayerDataService
         if (p == null) return;
         
         PlayerPrefs.SetInt("TotalGems", p.Gems);
-        PlayerPrefs.SetInt("TotalCoins", p.Coins);
         PlayerPrefs.SetInt("MMR", p.Mmr);
         PlayerPrefs.SetString("Username", p.Username);
         
@@ -282,7 +274,6 @@ public static class PlayerDataService
         LocalProfile = new PlayerProfile
         {
             Gems = PlayerPrefs.GetInt("TotalGems", 0),
-            Coins = PlayerPrefs.GetInt("TotalCoins", 0),
             Mmr = PlayerPrefs.GetInt("MMR", 1000),
             Username = PlayerPrefs.GetString("Username", "Player"),
             EquippedFrame = PlayerPrefs.GetString("EquippedFrame", "frame_default"),

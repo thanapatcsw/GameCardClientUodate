@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "patch": "Pack 1 - ความรู้ทั่วไป",
+  "totalQuestions": 5,
+  "questions": [
+    {
+      "id": "q001",
+      "category": "วิทยาศาสตร์",
+      "difficulty": "easy",
+      "question": "น้ำมีสูตรทางเคมีว่าอะไร?",
+      "choices": ["H2O", "CO2", "NaCl", "O2"],
+      "correctIndex": 0
+    },
+    {
+      "id": "q002",
+      "category": "คณิตศาสตร์",
+      "difficulty": "medium",
+      "question": "2 + 2 × 2 = ?",
+      "choices": ["4", "6", "8", "2"],
+      "correctIndex": 1
+    },
+    {
+      "id": "q003",
+      "category": "ประวัติศาสตร์",
+      "difficulty": "hard",
+      "question": "กรุงเทพมหานครก่อตั้งเมื่อปี พ.ศ. ใด?",
+      "choices": ["2316", "2325", "2350", "2310"],
+      "correctIndex": 1
+    },
+    {
+      "id": "q004",
+      "category": "ภาษาอังกฤษ",
+      "difficulty": "easy",
+      "question": "คำว่า 'Apple' แปลว่าอะไร?",
+      "choices": ["กล้วย", "แอปเปิล", "ส้ม", "มะม่วง"],
+      "correctIndex": 1
+    },
+    {
+      "id": "q005",
+      "category": "วิทยาศาสตร์",
+      "difficulty": "medium",
+      "question": "ดาวเคราะห์ดวงใดใหญ่ที่สุดในระบบสุริยะ?",
+      "choices": ["โลก", "ดาวเสาร์", "ดาวพฤหัส", "ดาวอังคาร"],
+      "correctIndex": 2
+    }
+  ]
+}
