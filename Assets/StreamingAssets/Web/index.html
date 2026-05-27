@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Startup City - Developer Registration</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Bai+Jamjuree:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
@@ -363,27 +362,25 @@
         <div class="register-card hidden" id="otpCard">
             <div class="header">
                 <div class="logo">VERIFY EMAIL</div>
-                <div class="subtitle">Enter the 8-digit code from your email</div>
+                <div class="subtitle">Enter the 6-digit code from your email</div>
             </div>
 
             <div class="otp-info">
                 📧 เราส่งรหัส OTP ไปยัง<br>
                 <b id="otpEmailDisplay">—</b><br>
-                <span style="font-size:11px;color:#64748b;">รหัสมีอายุ 10 นาที</span>
+                <span style="font-size:11px;color:#64748b;">รหัสมีอายุ 5 นาที</span>
             </div>
 
             <form id="otpForm">
-                <div class="otp-group-label">กรอกรหัส 8 หลัก</div>
+                <div class="otp-group-label">กรอกรหัส 6 หลัก</div>
                 <div class="otp-inputs" id="otpInputs">
                     <input type="text" inputmode="numeric" maxlength="1" data-idx="0" autocomplete="one-time-code">
                     <input type="text" inputmode="numeric" maxlength="1" data-idx="1">
                     <input type="text" inputmode="numeric" maxlength="1" data-idx="2">
-                    <input type="text" inputmode="numeric" maxlength="1" data-idx="3">
                     <span class="otp-separator">–</span>
+                    <input type="text" inputmode="numeric" maxlength="1" data-idx="3">
                     <input type="text" inputmode="numeric" maxlength="1" data-idx="4">
                     <input type="text" inputmode="numeric" maxlength="1" data-idx="5">
-                    <input type="text" inputmode="numeric" maxlength="1" data-idx="6">
-                    <input type="text" inputmode="numeric" maxlength="1" data-idx="7">
                 </div>
 
                 <button type="submit" class="submit-btn" id="verifyBtn">
@@ -404,7 +401,25 @@
         const SUPABASE_URL = 'https://uwspzhwvjpkcjpoqgkhp.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3B6aHd2anBrY2pwb3Fna2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzUwMzYsImV4cCI6MjA5MDQxMTAzNn0.hgTN21pBcTD2meqXxKnydit0U7inI3OpMOAFVy9NtEE';
 
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // ───── เรียก Edge Function ที่เราเขียนเอง (ระบบ OTP แบบ custom) ─────
+        // generate / verify ทำบน server (Edge Function) เท่านั้น ไม่ทำบน client
+        async function callFn(name, body) {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify(body)
+            });
+            let data = {};
+            try { data = await res.json(); } catch (_) {}
+            if (!res.ok) {
+                throw new Error(data.error || `เกิดข้อผิดพลาด (${res.status})`);
+            }
+            return data;
+        }
 
         const form = document.getElementById('registerForm');
         const submitBtn = document.getElementById('submitBtn');
@@ -477,17 +492,10 @@
             submitBtn.innerHTML = '<span>SENDING OTP...</span>';
 
             try {
-                const { data, error } = await _supabase.auth.signUp({
-                    email: email,
-                    password: password,
-                    options: {
-                        data: { username: username }
-                    }
-                });
+                // เรียก Edge Function ของเราเอง: สุ่มโค้ด 6 หลัก, เก็บ hash ลง DB, ส่งอีเมล
+                await callFn('send-otp', { email, username });
 
-                if (error) throw error;
-
-                // เก็บข้อมูลไว้สำหรับขั้นตอน verify
+                // เก็บข้อมูลไว้สำหรับขั้นตอน verify (password ส่งตอน verify เพื่อสร้าง user)
                 pendingSignup = { email, password, username };
 
                 // เปลี่ยนไปหน้า OTP
@@ -549,8 +557,8 @@
                 if (inp.value && idx < otpInputs.length - 1) {
                     otpInputs[idx + 1].focus();
                 }
-                // auto-submit เมื่อกรอกครบ 8 หลัก
-                if (idx === otpInputs.length - 1 && readOtp().length === 8) {
+                // auto-submit เมื่อกรอกครบ 6 หลัก
+                if (idx === otpInputs.length - 1 && readOtp().length === 6) {
                     otpForm.requestSubmit();
                 }
             });
@@ -569,14 +577,14 @@
             inp.addEventListener('paste', (e) => {
                 e.preventDefault();
                 const text = (e.clipboardData || window.clipboardData).getData('text');
-                const digits = text.replace(/\D/g, '').slice(0, 8);
+                const digits = text.replace(/\D/g, '').slice(0, 6);
                 digits.split('').forEach((d, i) => {
                     if (otpInputs[i]) {
                         otpInputs[i].value = d;
                         otpInputs[i].classList.add('filled');
                     }
                 });
-                if (digits.length === 8) otpForm.requestSubmit();
+                if (digits.length === 6) otpForm.requestSubmit();
                 else if (otpInputs[digits.length]) otpInputs[digits.length].focus();
             });
         });
@@ -587,11 +595,11 @@
             if (!pendingSignup) return;
 
             const token = readOtp();
-            if (token.length !== 8) {
+            if (token.length !== 6) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'กรอกรหัสไม่ครบ',
-                    text: 'กรุณากรอก OTP ให้ครบ 8 หลัก',
+                    text: 'กรุณากรอก OTP ให้ครบ 6 หลัก',
                     confirmButtonColor: '#00f3ff'
                 });
                 return;
@@ -601,13 +609,13 @@
             verifyBtn.innerHTML = '<span>VERIFYING...</span>';
 
             try {
-                const { data, error } = await _supabase.auth.verifyOtp({
+                // Edge Function: ตรวจ hash + เวลา + จำนวนครั้ง, ถ้าผ่านจึงสร้าง user
+                await callFn('verify-otp', {
                     email: pendingSignup.email,
-                    token: token,
-                    type: 'signup'
+                    code: token,
+                    password: pendingSignup.password,
+                    username: pendingSignup.username
                 });
-
-                if (error) throw error;
 
                 Swal.fire({
                     icon: 'success',
@@ -679,11 +687,11 @@
             resendBtn.textContent = 'กำลังส่ง...';
 
             try {
-                const { error } = await _supabase.auth.resend({
-                    type: 'signup',
-                    email: pendingSignup.email
+                // ส่งโค้ดใหม่ = เรียก send-otp ซ้ำ (Function จะ invalidate โค้ดเก่าให้)
+                await callFn('send-otp', {
+                    email: pendingSignup.email,
+                    username: pendingSignup.username
                 });
-                if (error) throw error;
 
                 Swal.fire({
                     icon: 'success',

@@ -66,13 +66,13 @@ public class LobbyPanelUI : MonoBehaviour
 
     private void OnStartClicked()
     {
-        Debug.Log("<color=green>[Lobby] เริ่มเกมมมม!</color>");
+        GameLog.Log("<color=green>[Lobby] เริ่มเกมมมม!</color>");
         // [TODO] สั่งให้ทึกคนข้าม Scene ไปยัง GameScene
     }
 
     private void OnLeaveClicked()
     {
-        Debug.Log("[Lobby] ออกจากห้อง");
+        GameLog.Log("[Lobby] ออกจากห้อง");
         // [TODO] สั่งให้ Fusion ตัดการเชื่อมต่อ
         Hide();
     }

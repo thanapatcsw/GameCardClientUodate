@@ -37,12 +37,24 @@ public class SupabaseManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         // เริ่มต้นการเชื่อมต่อ Supabase ทันทีที่เปิดเกม
-        await InitializeSupabase();
+        // ครอบ try/catch เพราะ async void ถ้า throw จะจับไม่ได้และทำให้แอปค้างเงียบ ๆ
+        try
+        {
+            await InitializeSupabase();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"<color=red>❌ [Supabase] เริ่มต้นการเชื่อมต่อล้มเหลว: {e.Message}</color>\n{e}");
+        }
     }
 
     private async Task InitializeSupabase()
     {
         IsInitialized = false;
+
+        // ถ้าไม่ได้กรอกใน Inspector ให้ดึงค่าจาก SupabaseConfig (แหล่งเดียว)
+        if (string.IsNullOrEmpty(supabaseUrl)) supabaseUrl = SupabaseConfig.Url;
+        if (string.IsNullOrEmpty(supabaseKey)) supabaseKey = SupabaseConfig.AnonKey;
 
         if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey))
         {
@@ -60,40 +72,18 @@ public class SupabaseManager : MonoBehaviour
         await supabaseClient.InitializeAsync();
         IsInitialized = true;
         
-        Debug.Log("<color=green>✅ [Supabase] เชื่อมต่อ Database สำเร็จแล้ว!</color>");
+        GameLog.Log("<color=green>✅ [Supabase] เชื่อมต่อ Database สำเร็จแล้ว!</color>");
 
         // ถ้ามี Session เก่าอยู่แล้ว (Auto Login) ให้โหลด Profile ทันที
         if (supabaseClient.Auth.CurrentUser != null)
         {
-            Debug.Log($"[Supabase] Active session found for: {supabaseClient.Auth.CurrentUser.Email}. Loading profile...");
+            GameLog.Log($"[Supabase] Active session found for: {supabaseClient.Auth.CurrentUser.Email}. Loading profile...");
             await PlayerDataService.LoadProfileAsync();
         }
     }
 
-    // ฟังก์ชันสำหรับสมัครสมาชิก (ส่งอีเมล รหัสผ่าน และชื่อผู้ใช้)
-    public async Task<bool> SignUpUser(string email, string password, string username)
-    {
-        try
-        {
-            // บันทึก Username ลงใน User Metadata ของ Supabase
-            var options = new SignUpOptions
-            {
-                Data = new Dictionary<string, object> { { "username", username } }
-            };
-
-            var session = await supabaseClient.Auth.SignUp(email, password, options);
-            if (session != null && session.User != null)
-            {
-                Debug.Log($"<color=green>✅ [Supabase] สมัครสมาชิกสำเร็จ: {session.User.Email} (Username: {username})</color>");
-                return true;
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"<color=red>❌ [Supabase] ระบบสมัครสมาชิกขัดข้อง: {e.Message}</color>");
-        }
-        return false;
-    }
+    // หมายเหตุ: การสมัครสมาชิกย้ายไปทำที่หน้าเว็บ (StreamingAssets/Web/index.html)
+    // ผ่านระบบ OTP (Edge Functions send-otp / verify-otp) แล้ว จึงไม่มี SignUpUser ในเกมอีกต่อไป
 
     // ฟังก์ชันสำหรับเข้าสู่ระบบ (ส่งกลับสถานะสำเร็จ และ ข้อความ Error แบบเจาะจง)
     public async Task<(bool success, string errorMsg)> SignInUser(string email, string password)
@@ -106,7 +96,7 @@ public class SupabaseManager : MonoBehaviour
             var session = await supabaseClient.Auth.SignIn(email, password);
             if (session != null && session.User != null)
             {
-                Debug.Log($"<color=green>✅ [Supabase] ล็อกอินสำเร็จ ยินดีต้อนรับ: {session.User.Email}</color>");
+                GameLog.Log($"<color=green>✅ [Supabase] ล็อกอินสำเร็จ ยินดีต้อนรับ: {session.User.Email}</color>");
                 
                 // โหลดข้อมูลผู้เล่น (Gems, MMR) จาก Database ทันทีที่ล็อกอิน
                 await PlayerDataService.LoadProfileAsync();
@@ -158,7 +148,7 @@ public class SupabaseManager : MonoBehaviour
             // บันทึกลงตาราง "rooms"
             await supabaseClient.From<RoomData>().Insert(room);
             
-            Debug.Log($"<color=green>✅ [Supabase] บันทึกห้อง [{roomCode}] ลงใน Database สำเร็จ!</color>");
+            GameLog.Log($"<color=green>✅ [Supabase] บันทึกห้อง [{roomCode}] ลงใน Database สำเร็จ!</color>");
             return true;
         }
         catch (System.Exception ex)
@@ -174,7 +164,7 @@ public class SupabaseManager : MonoBehaviour
         if (supabaseClient?.Auth != null)
         {
             await supabaseClient.Auth.SignOut();
-            Debug.Log("<color=orange>⚠️ [Supabase] ออกจากระบบแล้ว</color>");
+            GameLog.Log("<color=orange>⚠️ [Supabase] ออกจากระบบแล้ว</color>");
 
             // ล้างเฉพาะ key ที่เกี่ยวกับ auth และ player data
             // ไม่ใช้ DeleteAll() เพราะจะลบ settings อื่นๆ ทิ้งโดยไม่ตั้งใจ

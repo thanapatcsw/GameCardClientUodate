@@ -77,7 +77,6 @@ Deno.serve(async (request) => {
   }
 
   const action: MatchmakingAction = payload.action ?? "find";
-  const playerId = typeof payload.playerId === "string" ? payload.playerId.trim() : "";
 
   if (!["find", "cancel"].includes(action)) {
     return jsonResponse(
@@ -86,12 +85,22 @@ Deno.serve(async (request) => {
     );
   }
 
-  if (!playerId) {
+  // ── ระบุตัวตนจาก JWT ผู้ใช้ (ไม่เชื่อ playerId ที่ client ส่งมา → กันปลอมเป็นคนอื่น) ──
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const authedClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: { user } } = await authedClient.auth.getUser();
+  if (!user) {
     return jsonResponse(
-      { status: "error", message: "playerId is required." },
-      400,
+      { status: "error", message: "ต้องเข้าสู่ระบบก่อนจับคู่" },
+      401,
     );
   }
+  // playerId = auth.uid() เสมอ (ค่า playerId ใน payload ถูกมองข้าม)
+  const playerId = user.id;
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: {

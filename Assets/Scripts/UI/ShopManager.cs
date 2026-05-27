@@ -46,7 +46,7 @@ public static class ShopManager
         if (item == null) return false;
         if (OwnsItem(item.itemId))
         {
-            Debug.Log($"[Shop] มีไอเทม '{item.itemId}' แล้ว");
+            GameLog.Log($"[Shop] มีไอเทม '{item.itemId}' แล้ว");
             return false;
         }
 
@@ -72,19 +72,19 @@ public static class ShopManager
         var owned = GetOwnedItems();
         owned.Add(item.itemId);
         SaveOwnedItems(owned);
-        
-        // [FIX] log error ถ้าบันทึกลง DB ไม่สำเร็จ (local PlayerPrefs อัปเดตแล้ว แต่ DB อาจพลาด)
-        var saveTask = PlayerDataService.SaveInventoryAsync(
-            new System.Collections.Generic.List<string>(owned),
-            GetEquippedFrame()
-        );
-        saveTask.ContinueWith(t =>
+
+        // เขียน DB แบบ server-authoritative: server เป็นคนหัก gems/เพิ่มไอเทมจริง
+        // (local ด้านบนเป็น optimistic update เพื่อ UI ทันที — server จะ reconcile ค่าให้ตรง)
+        var buyTask = PlayerDataService.PurchaseItemAsync(item.itemId);
+        buyTask.ContinueWith(t =>
         {
             if (t.IsFaulted)
-                Debug.LogError($"[Shop] บันทึก inventory ลง DB ไม่สำเร็จ: {t.Exception?.GetBaseException().Message}");
+                Debug.LogError($"[Shop] ซื้อบน server ไม่สำเร็จ: {t.Exception?.GetBaseException().Message}");
+            else if (!t.Result.ok)
+                Debug.LogWarning($"[Shop] server ปฏิเสธการซื้อ: {t.Result.error}");
         }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
 
-        Debug.Log($"[Shop] ซื้อ '{item.itemName}' สำเร็จ! เสียไป {item.price} Gems");
+        GameLog.Log($"[Shop] ซื้อ '{item.itemName}' สำเร็จ! เสียไป {item.price} Gems");
         return true;
     }
 
@@ -104,18 +104,11 @@ public static class ShopManager
         }
         PlayerPrefs.SetString(EQUIPPED_KEY, itemId);
         PlayerPrefs.Save();
-        
-        var saveTask = PlayerDataService.SaveInventoryAsync(
-            new System.Collections.Generic.List<string>(GetOwnedItems()),
-            itemId
-        );
-        saveTask.ContinueWith(t =>
-        {
-            if (t.IsFaulted)
-                Debug.LogError($"[Shop] บันทึก equip ลง DB ไม่สำเร็จ: {t.Exception?.GetBaseException().Message}");
-        }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
 
-        Debug.Log($"[Shop] Equip frame: {itemId}");
+        // เขียน DB ผ่าน server (equip-cosmetic) — server ตรวจ ownership ก่อนสวม
+        _ = PlayerDataService.EquipFrameAsync(itemId);
+
+        GameLog.Log($"[Shop] Equip frame: {itemId}");
     }
 
     // ─── Sprite Loader ────────────────────────────────────────────────────

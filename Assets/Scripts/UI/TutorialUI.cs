@@ -199,7 +199,7 @@ public class TutorialUI : MonoBehaviour
 
         // ── Body text ──
         bodyText = NewText("Body", cardT, new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.54f), "Body", 14, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        bodyText.enableWordWrapping = true;
+        bodyText.textWrappingMode = TextWrappingModes.Normal;
         bodyText.lineSpacing = 5f;
         bodyText.color = new Color(0.88f, 0.93f, 1f, 1f);
 
@@ -229,7 +229,7 @@ public class TutorialUI : MonoBehaviour
         nextBtnLbl = NewText("Lbl", nextGo.transform, Vector2.zero, Vector2.one, "ถัดไป >", 13, FontStyles.Normal, TextAlignmentOptions.Center);
 
         EditorUtility.SetDirty(this);
-        Debug.Log("[TutorialUI] สร้างและเชื่อมต่อช่องภาพ Illustration (PNG) สำเร็จ!");
+        GameLog.Log("[TutorialUI] สร้างและเชื่อมต่อช่องภาพ Illustration (PNG) สำเร็จ!");
     }
 
     private GameObject NewPanel(string n, Transform parent, Vector2 anchorMin, Vector2 anchorMax)
@@ -259,7 +259,7 @@ public class TutorialUI : MonoBehaviour
         tmp.fontStyle = style;
         tmp.alignment = align;
         tmp.color = Color.white;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         if (customFont != null) tmp.font = customFont;
         return tmp;
     }

@@ -105,6 +105,8 @@ public class GameController : MonoBehaviour
             FusionManager.Instance.ActivePlayersChanged += HandleFusionActivePlayersChanged;
             FusionManager.Instance.TurnStateReceived += HandleOnlineTurnStateReceived;
             FusionManager.Instance.EconomyStateReceived += HandleOnlineEconomyStateReceived;
+            FusionManager.Instance.BoardStateReceived += HandleOnlineBoardStateReceived;
+            FusionManager.Instance.FullStateRequested += HandleFullStateRequested;
         }
 
         EnsureBotController();
@@ -124,7 +126,7 @@ public class GameController : MonoBehaviour
         {
             // กรณีเหรียญถูกวางมือไว้ใน Scene แล้ว (ไม่มี resourcePrefab)
             // ไปเก็บ ResourceButton ที่อยู่ใน container มาใส่ bankButtons
-            Debug.Log("[GameController] ไม่มี resourcePrefab → ใช้เหรียญที่วางมือไว้ใน ResourceBankPanel");
+            GameLog.Log("[GameController] ไม่มี resourcePrefab → ใช้เหรียญที่วางมือไว้ใน ResourceBankPanel");
             bankButtons.Clear();
             foreach (Transform child in resourceBankContainer)
             {
@@ -132,7 +134,7 @@ public class GameController : MonoBehaviour
                 if (btn != null)
                 {
                     bankButtons.Add(btn);
-                    Debug.Log($"[GameController] พบเหรียญที่วางไว้: {btn.resourceType}");
+                    GameLog.Log($"[GameController] พบเหรียญที่วางไว้: {btn.resourceType}");
                 }
             }
         }
@@ -145,6 +147,8 @@ public class GameController : MonoBehaviour
         LoadCardDatabase();
 
         // Setup กระดานไพ่ (ต้องการ cardPrefab)
+        // ทุกคนสุ่มกระดานของตัวเองก่อนเสมอ เพื่อให้เห็นการ์ดทันที (ไม่พึ่ง timing ของ IsMasterClient)
+        // ในโหมดออนไลน์ Host จะ broadcast BoardStateSnapshot ตามมาเพื่อ reconcile ให้ทุกเครื่องตรงกัน
         if (cardPrefab != null)
             PopulateBoard();
         else
@@ -160,7 +164,7 @@ public class GameController : MonoBehaviour
             Debug.LogWarning("[GameController] ยังไม่ได้ผูก noblePrefab หรือ masterNobles → ข้ามการสร้างขุนนาง");
         }
 
-        Debug.Log($"\n========== เริ่มเกม: รอบที่ {currentRound} ==========\n");
+        GameLog.Log($"\n========== เริ่มเกม: รอบที่ {currentRound} ==========\n");
         ResetTimer();
         UpdateTurnVisuals();
         UpdateBankUI();
@@ -169,7 +173,7 @@ public class GameController : MonoBehaviour
     // [NEW] ฟังก์ชันสำหรับปุ่ม Exit หรือ Leave Room (สำหรับลากไปใส่ OnClick ของปุ่ม)
     public void LeaveToMainMenu()
     {
-        Debug.Log("[GameController] Leaving match and returning to main menu...");
+        GameLog.Log("[GameController] Leaving match and returning to main menu...");
 
         // 1. ล้างสถานะเกมทั้งหมด
         PlayerPrefs.DeleteKey("GameMode");
@@ -194,7 +198,7 @@ public class GameController : MonoBehaviour
         if (ShouldWaitForOnlineOpponent())
         {
             ShowWarning("Waiting for opponent...");
-            Debug.Log("[GameController] Waiting for the second online player to join before starting gameplay.");
+            GameLog.Log("[GameController] Waiting for the second online player to join before starting gameplay.");
             return;
         }
 
@@ -213,14 +217,38 @@ public class GameController : MonoBehaviour
 
         if (isOnlineMatchMode && FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
         {
+            PublishOnlineBoardState();
             PublishOnlineEconomyState();
             PublishOnlineTurnState();
+        }
+        else if (isOnlineMatchMode && FusionManager.Instance != null)
+        {
+            // client พร้อมแล้ว (subscribe event ครบ + ฉากโหลดเสร็จ) → ขอ full state ปัจจุบันจาก host
+            // กัน late-joiner desync: ดึงเอง แทนการพึ่ง broadcast ของ host ที่อาจมาถึงก่อน client subscribe
+            FusionManager.Instance.RequestFullState();
         }
 
         if (QuizManager.Instance != null)
         {
-            Debug.Log("[GameController] Starting first-round quiz.");
-            QuizManager.Instance.StartQuiz();
+            if (!isOnlineMatchMode)
+            {
+                // offline: เริ่มควิซรอบแรกได้ทันที
+                GameLog.Log("[GameController] Starting first-round quiz.");
+                QuizManager.Instance.StartQuiz();
+            }
+            else if (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
+            {
+                // Host: ยังไม่เริ่มควิซรอบแรกตอนนี้ เพราะ client อาจโหลดฉากยังไม่เสร็จ (จะ broadcast หลุด)
+                // รอจน client ส่ง RequestQuizStart เข้ามา (= พร้อมรับแล้ว) ค่อยเริ่ม
+                GameLog.Log("[GameController] Host waiting for a client to request the first-round quiz...");
+            }
+            else if (FusionManager.Instance != null)
+            {
+                // Client: เข้าโหมดรอ (เผื่อ Host เคย broadcast มาแล้วจะ consume buffer) + บอก Host ว่าพร้อมเริ่มได้
+                GameLog.Log("[GameController] Client ready → requesting first-round quiz from Host.");
+                QuizManager.Instance.StartQuiz();
+                FusionManager.Instance.RequestQuizStart();
+            }
         }
         else
         {
@@ -236,7 +264,23 @@ public class GameController : MonoBehaviour
             FusionManager.Instance.ActivePlayersChanged -= HandleFusionActivePlayersChanged;
             FusionManager.Instance.TurnStateReceived -= HandleOnlineTurnStateReceived;
             FusionManager.Instance.EconomyStateReceived -= HandleOnlineEconomyStateReceived;
+            FusionManager.Instance.BoardStateReceived -= HandleOnlineBoardStateReceived;
+            FusionManager.Instance.FullStateRequested -= HandleFullStateRequested;
         }
+    }
+
+    // host: late-joiner ขอ full state มา → ส่ง board/economy/turn ปัจจุบันกลับเฉพาะคนที่ขอ
+    private void HandleFullStateRequested(int requesterPlayerId)
+    {
+        if (!isOnlineMatchMode || FusionManager.Instance == null || !FusionManager.Instance.IsMasterClient)
+        {
+            return;
+        }
+
+        GameLog.Log($"[GameController] Host ได้รับคำขอ full state จาก player {requesterPlayerId} → ส่งกลับเฉพาะคนนั้น");
+        FusionManager.Instance.SendBoardStateToPlayer(requesterPlayerId, BuildBoardSnapshot());
+        FusionManager.Instance.SendEconomyStateToPlayer(requesterPlayerId, BuildEconomySnapshot());
+        FusionManager.Instance.SendTurnStateToPlayer(requesterPlayerId, currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay);
     }
 
     private bool IsMatchedOnlineSession()
@@ -282,7 +326,14 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        Debug.Log("[GameController] Online players ready. Refreshing PvP setup.");
+        GameLog.Log("[GameController] Online players ready. Refreshing PvP setup.");
+
+        // Host re-broadcast กระดานปัจจุบันให้ผู้เล่นที่เพิ่งเข้ามา (late joiner) เห็นตรงกัน
+        if (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
+        {
+            PublishOnlineBoardState();
+        }
+
         StartInitialGameplay();
     }
 
@@ -369,7 +420,7 @@ public class GameController : MonoBehaviour
             }
         }
 
-        Debug.Log($"[GameController] สร้างและสุ่มขุนนาง 4 ใบเรียบร้อย");
+        GameLog.Log($"[GameController] สร้างและสุ่มขุนนาง 4 ใบเรียบร้อย");
     }
 
     void Update()
@@ -400,7 +451,7 @@ public class GameController : MonoBehaviour
             
             if (currentTurnTime <= 0) 
             {
-                Debug.Log($"[GameController] หมดเวลาในเทิร์นของผู้เล่น {playOrder[currentPlayerIndex] + 1}");
+                GameLog.Log($"[GameController] หมดเวลาในเทิร์นของผู้เล่น {playOrder[currentPlayerIndex] + 1}");
                 ShowWarning($"[ผู้เล่น {playOrder[currentPlayerIndex] + 1}] หมดเวลา! บังคับข้ามเทิร์น");
                 ClearPendingCoins(); 
                 EndTurn(); 
@@ -414,7 +465,7 @@ public class GameController : MonoBehaviour
         playOrder = newOrder; 
         currentPlayerIndex = 0; 
         
-        Debug.Log($"<color=orange>[GameController] บังคับใช้คิวการเล่นใหม่เรียบร้อย!</color>");
+        GameLog.Log($"<color=orange>[GameController] บังคับใช้คิวการเล่นใหม่เรียบร้อย!</color>");
         
         ClearPendingCoins();
         UpdateTurnVisuals();
@@ -458,7 +509,7 @@ public class GameController : MonoBehaviour
         // [FIX] ถ้ามี Turn Order ที่ Quiz ส่งมา ให้ Apply ก่อน แล้วค่อย Schedule Bot
         if (pendingQuizTurnOrder != null)
         {
-            Debug.Log("[GameController] Applying pending quiz turn order from OnResultScreenClosed");
+            GameLog.Log("[GameController] Applying pending quiz turn order from OnResultScreenClosed");
             ApplyNewTurnOrder(pendingQuizTurnOrder);
             pendingQuizTurnOrder = null;
         }
@@ -471,7 +522,7 @@ public class GameController : MonoBehaviour
     public void SetPendingQuizTurnOrder(int[] newOrder)
     {
         pendingQuizTurnOrder = newOrder;
-        Debug.Log("[GameController] Stored pending quiz turn order");
+        GameLog.Log("[GameController] Stored pending quiz turn order");
     }
 
     public bool IsGameplayInputLocked()
@@ -698,10 +749,13 @@ public class GameController : MonoBehaviour
 
             Transform parentContainer = card.transform.parent;
             int tier = (parentContainer == tier3Container) ? 3 : (parentContainer == tier2Container) ? 2 : 1;
-            Destroy(card.gameObject); 
-            DrawNewCard(tier, parentContainer);
-            
-            ClearWarning(); 
+            int slotIndex = card.transform.GetSiblingIndex(); // จำช่องเดิมไว้ก่อนดึงการ์ดออก
+            // ดึงออกจาก container ก่อน Destroy (deferred) ไม่งั้น BuildBoardSnapshot จะนับใบที่กำลังถูกลบติดไปด้วย
+            card.transform.SetParent(null);
+            Destroy(card.gameObject);
+            DrawNewCard(tier, parentContainer, slotIndex);
+
+            ClearWarning();
             UpdateBankUI(); 
             EndTurn(); 
         } else {
@@ -792,12 +846,15 @@ public class GameController : MonoBehaviour
 
         Transform parentContainer = card.transform.parent;
         int tier = (parentContainer == tier3Container) ? 3 : (parentContainer == tier2Container) ? 2 : 1;
+        int slotIndex = card.transform.GetSiblingIndex(); // จำช่องเดิมไว้ก่อนดึงการ์ดออก
+        // ดึงออกจาก container ก่อน Destroy (deferred) ไม่งั้น BuildBoardSnapshot จะนับใบที่กำลังถูกลบติดไปด้วย
+        card.transform.SetParent(null);
         Destroy(card.gameObject);
-        DrawNewCard(tier, parentContainer);
+        DrawNewCard(tier, parentContainer, slotIndex);
 
         ClearWarning();
         UpdateBankUI();
-        EndTurn(); 
+        EndTurn();
     }
 
     public void BuyReservedCard(CardDisplay card)
@@ -893,6 +950,7 @@ public class GameController : MonoBehaviour
 
         if (isOnlineMatchMode)
         {
+            PublishOnlineBoardState();
             PublishOnlineEconomyState();
         }
 
@@ -913,7 +971,7 @@ public class GameController : MonoBehaviour
             currentPlayerIndex = 0;
             currentRound++;
             isNewRound = true; // ระบุว่ากำลังขึ้นรอบใหม่
-            Debug.Log($"\n========== เริ่มรอบที่ {currentRound} ==========\n");
+            GameLog.Log($"\n========== เริ่มรอบที่ {currentRound} ==========\n");
         }
 
         // [Phase 2] อัปเดตเลขเทิร์นและเช็คการเรียกควิซ
@@ -927,15 +985,30 @@ public class GameController : MonoBehaviour
         if (shouldStartQuiz) {
             if (QuizManager.Instance != null) {
                 string quizTriggerLabel = $"รอบที่ {currentTurnDisplay}";
-                Debug.Log($"<color=cyan>[Quiz] {quizTriggerLabel} -> ถึงเวลาเรียกควิซแล้ว!</color>");
+                GameLog.Log($"<color=cyan>[Quiz] {quizTriggerLabel} -> ถึงเวลาเรียกควิซแล้ว!</color>");
                 startedQuizThisTurn = true;
-                QuizManager.Instance.StartQuiz();
+
+                bool canStartQuizLocally = !isOnlineMatchMode
+                    || (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient);
+
+                if (canStartQuizLocally)
+                {
+                    // offline หรือเราเป็น host → เลือกคำถามแล้ว broadcast ให้ทุกคนได้เลย
+                    QuizManager.Instance.StartQuiz();
+                }
+                else if (FusionManager.Instance != null)
+                {
+                    // ออนไลน์และเราไม่ใช่ host → ขอให้ host เริ่มควิซ แล้ว host จะ broadcast มาให้ทุกคน
+                    GameLog.Log("[Quiz] Client ถึงรอบควิซ → ส่งคำขอให้ Host เริ่มควิซ");
+                    FusionManager.Instance.RequestQuizStart();
+                }
             }
         }
 
         ResetTimer();
         UpdateTurnVisuals();
-        PublishOnlineEconomyState();
+        // board + economy ถูก publish ไปแล้วที่ต้นฟังก์ชัน (บรรทัด ~931) และไม่เปลี่ยนอีกหลังจากนั้น
+        // จึงส่งซ้ำเฉพาะ turn state ที่เพิ่ง advance เท่านั้น (ลด network traffic ครึ่งนึงตอนจบเทิร์น)
         PublishOnlineTurnState();
         if (!startedQuizThisTurn) {
             ScheduleBotTurnIfNeeded();
@@ -991,37 +1064,31 @@ public class GameController : MonoBehaviour
                                 finishRank == 2 ? 3 :
                                 finishRank == 3 ? 2 : 1;
 
-                // --- บันทึกผ่าน CurrencyManager (ถ้ามี) หรือ fallback PlayerPrefs ---
-                if (CurrencyManager.Instance != null)
-                {
-                    CurrencyManager.Instance.SaveEndGameRewards(gemReward);
-                }
-                else
-                {
-                    PlayerPrefs.SetInt("TotalGems",  PlayerPrefs.GetInt("TotalGems", 0) + gemReward);
-                    PlayerPrefs.Save();
-                }
+                // --- บันทึก Gem reward (local-only เพื่อโชว์ผลทันที; DB เขียนโดย server ด้านล่าง) ---
+                PlayerPrefs.SetInt("TotalGems", PlayerPrefs.GetInt("TotalGems", 0) + gemReward);
+                PlayerPrefs.Save();
+                CurrencyManager.Instance?.RefreshFromLocalCache();
 
                 // --- บันทึก Points ---
                 int currentTotalPoints = PlayerPrefs.GetInt("TotalPoints", 0);
                 PlayerPrefs.SetInt("TotalPoints", currentTotalPoints + earnedPoints);
                 PlayerPrefs.Save();
 
-                // --- บันทึก MMR ---
+                // --- คำนวณ MMR ฝั่ง local สำหรับโชว์ผลทันที (ResultScreen) ---
                 int currentMmr = PlayerDataService.LocalProfile?.Mmr ?? PlayerPrefs.GetInt("MMR", 1000);
                 int mmrDelta = MmrCalculator.Calculate(finishRank, activePlayerCount);
                 int newMmr = MmrCalculator.Clamp(currentMmr + mmrDelta);
-                bool isWinner = finishRank == 1;
-
-                _ = PlayerDataService.SaveMatchResultAsync(newMmr, isWinner);
-                Debug.Log($"[GameController] MMR: {currentMmr} + {mmrDelta} = {newMmr}");
-
-                // เก็บ delta ไว้ให้ ResultScreen แสดง
                 PlayerPrefs.SetInt("LastMmrDelta", mmrDelta);
                 PlayerPrefs.SetInt("MMR", newMmr);
                 PlayerPrefs.Save();
 
-                Debug.Log($"[GameController] จบเกมอันดับ {finishRank} | +{earnedCoins} Coins, +{gemReward} Gems, +{earnedPoints} Points");
+                // --- เขียนลง DB แบบ server-authoritative: server คำนวณ MMR/gems เอง ---
+                // client ส่งแค่ "อันดับ + จำนวนผู้เล่น" จึงปลอมค่า MMR/gems ลง DB ไม่ได้
+                // (ค่าที่ server คืนจะตรงกับ local เพราะใช้สูตรเดียวกัน — MmrCalculator)
+                _ = PlayerDataService.SubmitMatchResultAsync(finishRank, activePlayerCount);
+                GameLog.Log($"[GameController] MMR (local preview): {currentMmr} + {mmrDelta} = {newMmr}");
+
+                GameLog.Log($"[GameController] จบเกมอันดับ {finishRank} | +{earnedCoins} Coins, +{gemReward} Gems, +{earnedPoints} Points");
             }
 
             // โชว์หน้าสรุปผลตอนจบเกม
@@ -1066,7 +1133,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    void DrawNewCard(int tier, Transform container) 
+    void DrawNewCard(int tier, Transform container, int slotIndex = -1)
     {
         List<CardData> masterDeck = tier == 3 ? tier3Cards : tier == 2 ? tier2Cards : tier1Cards;
         if (masterDeck == null || masterDeck.Count == 0) return;
@@ -1081,7 +1148,7 @@ public class GameController : MonoBehaviour
         // ถ้าหมดกองแล้ว ไม่สุ่มใบใหม่ขึ้นมา
         if (availableCards.Count == 0)
         {
-            Debug.Log($"[GameController] กอง Tier {tier} หมดแล้ว ไม่มีการ์ดให้สุ่มเพิ่ม");
+            GameLog.Log($"[GameController] กอง Tier {tier} หมดแล้ว ไม่มีการ์ดให้สุ่มเพิ่ม");
             return;
         }
 
@@ -1089,6 +1156,12 @@ public class GameController : MonoBehaviour
         usedCardIds.Add(selectedCard.cardId); // บันทึกว่าใบนี้ถูกใช้แล้ว
         GameObject newCardObj = Instantiate(cardPrefab, container);
         newCardObj.GetComponent<CardDisplay>()?.LoadCardData(selectedCard);
+
+        // วางการ์ดใหม่ที่ช่องเดิมของใบที่หายไป (ถ้าระบุมา) แทนการต่อท้าย
+        if (slotIndex >= 0)
+        {
+            newCardObj.transform.SetSiblingIndex(slotIndex);
+        }
     }
 
     /// <summary>
@@ -1100,7 +1173,7 @@ public class GameController : MonoBehaviour
         tier1Cards = CardDatabaseLoader.Tier1Cards;
         tier2Cards = CardDatabaseLoader.Tier2Cards;
         tier3Cards = CardDatabaseLoader.Tier3Cards;
-        Debug.Log($"[GameController] โหลดการ์ดจาก JSON สำเร็จ! T1:{tier1Cards.Count} T2:{tier2Cards.Count} T3:{tier3Cards.Count}");
+        GameLog.Log($"[GameController] โหลดการ์ดจาก JSON สำเร็จ! T1:{tier1Cards.Count} T2:{tier2Cards.Count} T3:{tier3Cards.Count}");
     }
 
     void ResetTimer() { currentTurnTime = turnDuration; }
@@ -1242,7 +1315,7 @@ public class GameController : MonoBehaviour
             }
             currentPlayerIndex = 0;
             localPlayerSlotIndex = GetResolvedLocalPlayerSlotIndex();
-            Debug.Log($"[GameController] Online PvP mode detected. Human player count={humanPlayerCount}, bots disabled.");
+            GameLog.Log($"[GameController] Online PvP mode detected. Human player count={humanPlayerCount}, bots disabled.");
         }
         else
         {
@@ -1272,7 +1345,7 @@ public class GameController : MonoBehaviour
                     {
                         finalName = humanName;
                         if (players[i].characterPortrait != null) players[i].characterPortrait.sprite = p1Data.portraitSprite;
-                        Debug.Log($"[GameController] Local player setup in slot {i + 1} as: {finalName} with character {p1Data.characterName}");
+                        GameLog.Log($"[GameController] Local player setup in slot {i + 1} as: {finalName} with character {p1Data.characterName}");
                     }
                     else
                     {
@@ -1283,7 +1356,7 @@ public class GameController : MonoBehaviour
                             if (players[i].characterPortrait != null) players[i].characterPortrait.sprite = remoteData.portraitSprite;
                             remainingChars.RemoveAt(r);
                         }
-                        Debug.Log($"[GameController] Remote player slot {i + 1} configured as human.");
+                        GameLog.Log($"[GameController] Remote player slot {i + 1} configured as human.");
                     }
                 } else {
                     // บอท: ลองหาชื่อจากไฟล์ตัวละคร ถ้าไม่มีให้ใช้ "Player X"
@@ -1314,12 +1387,33 @@ public class GameController : MonoBehaviour
             }
         }
 
-        ConfigureOnlinePlayerPanelLayout();
+        // เลื่อนการ capture+apply ตำแหน่ง panel ไปหลัง Canvas จัด layout เสร็จ (end of frame)
+        // เพื่อให้ Editor และ Build จับตำแหน่งจาก state ที่ settle เหมือนกัน (กัน UI เพี้ยนใน build)
+        if (panelLayoutCoroutine != null) StopCoroutine(panelLayoutCoroutine);
+        panelLayoutCoroutine = StartCoroutine(ConfigureOnlinePlayerPanelLayoutDeferred());
     }
-    
-    void ClearContainer(Transform c) { 
-        if (c == null) return; 
-        foreach (Transform child in c) Destroy(child.gameObject); 
+
+    private Coroutine panelLayoutCoroutine;
+
+    private IEnumerator ConfigureOnlinePlayerPanelLayoutDeferred()
+    {
+        // รอให้ผ่าน layout pass + render ของเฟรมนี้ก่อน แล้วบังคับอัปเดต canvas ให้ตำแหน่งนิ่ง
+        yield return new WaitForEndOfFrame();
+        Canvas.ForceUpdateCanvases();
+        ConfigureOnlinePlayerPanelLayout();
+        panelLayoutCoroutine = null;
+    }
+
+    void ClearContainer(Transform c) {
+        if (c == null) return;
+        // เก็บลูกทั้งหมดก่อน แล้วค่อย detach+Destroy เพื่อไม่ให้ใบที่กำลังถูกลบ (deferred)
+        // ยังถูกนับว่าอยู่ใน container ตอน BuildBoardSnapshot/rebuild ในเฟรมเดียวกัน
+        List<Transform> children = new List<Transform>();
+        foreach (Transform child in c) children.Add(child);
+        foreach (Transform child in children) {
+            child.SetParent(null);
+            Destroy(child.gameObject);
+        }
     }
 
     private void ApplyNetworkPlayerNamesToUi()
@@ -1347,7 +1441,7 @@ public class GameController : MonoBehaviour
                 players[seatIndex].nameText.text = playerName;
             }
 
-            Debug.Log($"[GameController] Updated player slot {seatIndex + 1} name to {playerName}");
+            GameLog.Log($"[GameController] Updated player slot {seatIndex + 1} name to {playerName}");
         }
     }
 
@@ -1486,6 +1580,143 @@ public class GameController : MonoBehaviour
         UpdateBankUI();
     }
 
+    // ===== Online Board (face-up market) Sync =====
+
+    public void PublishOnlineBoardState()
+    {
+        if (!isOnlineMatchMode || FusionManager.Instance == null)
+        {
+            return;
+        }
+
+        FusionManager.Instance.SendBoardState(BuildBoardSnapshot());
+    }
+
+    private FusionManager.BoardStateSnapshot BuildBoardSnapshot()
+    {
+        return new FusionManager.BoardStateSnapshot
+        {
+            Tier1CardIds = GetBoardTierCardIds(tier1Container),
+            Tier2CardIds = GetBoardTierCardIds(tier2Container),
+            Tier3CardIds = GetBoardTierCardIds(tier3Container),
+            UsedCardIds = new List<string>(usedCardIds).ToArray()
+        };
+    }
+
+    private string[] GetBoardTierCardIds(Transform container)
+    {
+        if (container == null)
+        {
+            return System.Array.Empty<string>();
+        }
+
+        List<string> ids = new List<string>();
+        foreach (Transform child in container)
+        {
+            CardDisplay display = child.GetComponent<CardDisplay>();
+            ids.Add(display != null && display.data != null ? display.data.cardId : string.Empty);
+        }
+
+        return ids.ToArray();
+    }
+
+    private void HandleOnlineBoardStateReceived(FusionManager.BoardStateSnapshot snapshot)
+    {
+        if (!isOnlineMatchMode)
+        {
+            return;
+        }
+
+        ApplyBoardSnapshot(snapshot);
+    }
+
+    private void ApplyBoardSnapshot(FusionManager.BoardStateSnapshot snapshot)
+    {
+        if (cardPrefab == null)
+        {
+            return;
+        }
+
+        // sync รายการการ์ดที่ถูกใช้แล้ว เพื่อให้ตอนถึงตาเราจั่วการ์ดได้ตรงกับ Host (กันการ์ดซ้ำ)
+        if (snapshot.UsedCardIds != null)
+        {
+            usedCardIds.Clear();
+            foreach (string id in snapshot.UsedCardIds)
+            {
+                if (!string.IsNullOrEmpty(id))
+                {
+                    usedCardIds.Add(id);
+                }
+            }
+        }
+
+        RebuildTierIfChanged(tier3Container, snapshot.Tier3CardIds);
+        RebuildTierIfChanged(tier2Container, snapshot.Tier2CardIds);
+        RebuildTierIfChanged(tier1Container, snapshot.Tier1CardIds);
+    }
+
+    private void RebuildTierIfChanged(Transform container, string[] cardIds)
+    {
+        if (container == null || cardIds == null)
+        {
+            return;
+        }
+
+        // เทียบสถานะปัจจุบันกับที่รับมา — ถ้าเหมือนกันแล้วไม่ rebuild (กันการ์ดกระพริบทุกเทิร์น)
+        List<string> incoming = new List<string>();
+        foreach (string id in cardIds)
+        {
+            if (!string.IsNullOrEmpty(id)) incoming.Add(id);
+        }
+
+        List<string> current = new List<string>();
+        foreach (Transform child in container)
+        {
+            CardDisplay display = child.GetComponent<CardDisplay>();
+            if (display != null && display.data != null) current.Add(display.data.cardId);
+        }
+
+        if (incoming.Count == current.Count)
+        {
+            bool identical = true;
+            for (int i = 0; i < incoming.Count; i++)
+            {
+                if (incoming[i] != current[i]) { identical = false; break; }
+            }
+
+            if (identical) return;
+        }
+
+        ClearContainer(container);
+        foreach (string id in incoming)
+        {
+            CardData data = FindCardDataById(id);
+            if (data == null)
+            {
+                Debug.LogWarning($"[GameController] ไม่พบ CardData สำหรับ cardId '{id}' ตอน sync กระดาน");
+                continue;
+            }
+
+            GameObject obj = Instantiate(cardPrefab, container);
+            obj.GetComponent<CardDisplay>()?.LoadCardData(data);
+        }
+    }
+
+    private CardData FindCardDataById(string cardId)
+    {
+        if (string.IsNullOrEmpty(cardId))
+        {
+            return null;
+        }
+
+        foreach (CardData card in CardDatabaseLoader.AllCards)
+        {
+            if (card != null && card.cardId == cardId) return card;
+        }
+
+        return null;
+    }
+
     private void ConfigureOnlinePlayerPanelLayout()
     {
         if (!isOnlineMatchMode || players == null || players.Length == 0)
@@ -1610,7 +1841,7 @@ public class GameController : MonoBehaviour
         {
             int randomColorIndex = Random.Range(0, 5);
             p1.AddBonus(randomColorIndex);
-            Debug.Log($"[Test] ให้โบนัสสีที่ {randomColorIndex} แก่ Player 1");
+            GameLog.Log($"[Test] ให้โบนัสสีที่ {randomColorIndex} แก่ Player 1");
         }
 
         // เช็คว่าโบนัสพอที่จะเชิญขุนนางลงมาหาได้หรือยัง
@@ -1639,7 +1870,7 @@ public class GameController : MonoBehaviour
             if (canClaim)
             {
                 string claimerName = player.nameText != null ? player.nameText.text : "ผู้เล่น";
-                Debug.Log($"[Noble] {claimerName} ได้รับขุนนาง: {data.nobleName} (+{data.victoryPoints} VP)");
+                GameLog.Log($"[Noble] {claimerName} ได้รับขุนนาง: {data.nobleName} (+{data.victoryPoints} VP)");
                 
                 // ให้คะแนน
                 player.AddScore(data.victoryPoints);

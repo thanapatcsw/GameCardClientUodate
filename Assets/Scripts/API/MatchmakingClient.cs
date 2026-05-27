@@ -108,7 +108,7 @@ public class MatchmakingClient : MonoBehaviour
         SetCancelButtonInteractable(true);
         SetStatus($"Searching {_targetPlayerCount} players...");
 
-        Debug.Log($"[Matchmaking] FindMatch pressed. PlayerId={_currentPlayerId}, TargetPlayers={_targetPlayerCount}, SearchRequestId={_searchRequestId}");
+        GameLog.Log($"[Matchmaking] FindMatch pressed. PlayerId={_currentPlayerId}, TargetPlayers={_targetPlayerCount}, SearchRequestId={_searchRequestId}");
         RestartPolling();
     }
 
@@ -124,7 +124,7 @@ public class MatchmakingClient : MonoBehaviour
         HideSearchPanel(resetTimer: true);
         SetStatus("Cancelled");
 
-        Debug.Log($"[Matchmaking] CancelMatchmaking pressed. PlayerId={_currentPlayerId}, SearchRequestId={cancelledSearchRequestId}");
+        GameLog.Log($"[Matchmaking] CancelMatchmaking pressed. PlayerId={_currentPlayerId}, SearchRequestId={cancelledSearchRequestId}");
 
         if (!string.IsNullOrWhiteSpace(cancelledSearchRequestId))
         {
@@ -222,7 +222,9 @@ public class MatchmakingClient : MonoBehaviour
             yield break;
         }
 
-        string authToken = SupabaseManager.Instance != null ? SupabaseManager.Instance.SupabaseAnonKey : string.Empty;
+        string anonKey = SupabaseManager.Instance != null ? SupabaseManager.Instance.SupabaseAnonKey : string.Empty;
+        // ส่ง JWT ของผู้ใช้ (ถ้ามี session) เพื่อให้ฝั่ง server ระบุ playerId จาก auth.uid() เอง
+        string userToken = SupabaseManager.Instance?.Client?.Auth?.CurrentSession?.AccessToken;
         string jsonPayload = JsonUtility.ToJson(payload);
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonPayload);
 
@@ -233,10 +235,12 @@ public class MatchmakingClient : MonoBehaviour
             request.timeout = Mathf.Clamp(Mathf.CeilToInt(requestTimeoutSeconds), 1, 60);
             request.SetRequestHeader("Content-Type", "application/json");
 
-            if (!string.IsNullOrWhiteSpace(authToken))
+            if (!string.IsNullOrWhiteSpace(anonKey))
             {
-                request.SetRequestHeader("apikey", authToken);
-                request.SetRequestHeader("Authorization", $"Bearer {authToken}");
+                request.SetRequestHeader("apikey", anonKey);
+                // ใช้ user token เป็น Bearer; ถ้าไม่มี session ใช้ anon (server จะตอบ 401 ให้เข้าสู่ระบบ)
+                string bearer = string.IsNullOrWhiteSpace(userToken) ? anonKey : userToken;
+                request.SetRequestHeader("Authorization", $"Bearer {bearer}");
             }
 
             _isRequestInFlight = true;
@@ -266,7 +270,7 @@ public class MatchmakingClient : MonoBehaviour
                 yield break;
             }
 
-            Debug.Log($"[Matchmaking] {actionName} response => {responsePayload.status} / roomCode={responsePayload.roomCode} / roomId={responsePayload.roomId}");
+            GameLog.Log($"[Matchmaking] {actionName} response => {responsePayload.status} / roomCode={responsePayload.roomCode} / roomId={responsePayload.roomId}");
             onComplete?.Invoke(responsePayload);
         }
     }
@@ -309,7 +313,7 @@ public class MatchmakingClient : MonoBehaviour
 
             if (isStaleSearchResponse)
             {
-                Debug.Log($"[Matchmaking] Ignoring stale response for SearchRequestId={response.searchRequestId}");
+                GameLog.Log($"[Matchmaking] Ignoring stale response for SearchRequestId={response.searchRequestId}");
                 return;
             }
         }
@@ -320,7 +324,7 @@ public class MatchmakingClient : MonoBehaviour
                 ShowSearchPanel();
                 SetCancelButtonInteractable(true);
                 SetStatus($"Searching {_targetPlayerCount} players...");
-                Debug.Log($"[Matchmaking] Waiting snapshot. TargetPlayers={_targetPlayerCount}, VisiblePlayers={FormatPlayersForLog(response.players)}, Message={response.message}, SearchRequestId={response.searchRequestId}");
+                GameLog.Log($"[Matchmaking] Waiting snapshot. TargetPlayers={_targetPlayerCount}, VisiblePlayers={FormatPlayersForLog(response.players)}, Message={response.message}, SearchRequestId={response.searchRequestId}");
                 return;
 
             case MatchedStatus:
@@ -341,7 +345,7 @@ public class MatchmakingClient : MonoBehaviour
                 PlayerPrefs.Save();
 
                 SetStatus("Match found");
-                Debug.Log($"[Matchmaking] Match found. RoomCode={response.roomCode}, RoomId={response.roomId}, Players={FormatPlayersForLog(response.players)}");
+                GameLog.Log($"[Matchmaking] Match found. RoomCode={response.roomCode}, RoomId={response.roomId}, Players={FormatPlayersForLog(response.players)}");
 
                 if (FusionManager.Instance != null)
                 {
@@ -422,7 +426,7 @@ public class MatchmakingClient : MonoBehaviour
             statusText.text = message;
         }
 
-        Debug.Log($"[Matchmaking] UI Status => {message}");
+        GameLog.Log($"[Matchmaking] UI Status => {message}");
     }
 
     private void SetErrorStatus(string errorMessage)
@@ -446,7 +450,7 @@ public class MatchmakingClient : MonoBehaviour
             string cachedPlayerId = PlayerPrefs.GetString(PlayerIdPrefsKey, string.Empty);
             if (!string.Equals(cachedPlayerId, authenticatedPlayerId, StringComparison.Ordinal))
             {
-                Debug.Log($"[Matchmaking] Syncing cached playerId to authenticated user. Cached={cachedPlayerId}, Authenticated={authenticatedPlayerId}");
+                GameLog.Log($"[Matchmaking] Syncing cached playerId to authenticated user. Cached={cachedPlayerId}, Authenticated={authenticatedPlayerId}");
                 PlayerPrefs.SetString(PlayerIdPrefsKey, authenticatedPlayerId);
                 PlayerPrefs.Save();
             }

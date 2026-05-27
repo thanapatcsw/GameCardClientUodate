@@ -42,13 +42,13 @@ public class BotController : MonoBehaviour
         // [FIX] null-safe nameText + รีเฟรช cache ถ้ายังไม่มี
         _colorToButtonCache = null; // invalidate cache ทุก turn เผื่อ bankButtons เปลี่ยน
         string botName = botPlayer?.nameText != null ? botPlayer.nameText.text : $"Bot {playerIndex + 1}";
-        Debug.Log($"<color=orange>[Bot] เริ่มเทิร์นของบอท: {botName}</color>");
+        GameLog.Log($"<color=orange>[Bot] เริ่มเทิร์นของบอท: {botName}</color>");
 
         // --- Priority 1: Check Win Condition ---
         CardDisplay winningCard = FindWinningCard(botPlayer);
         if (winningCard != null)
         {
-            Debug.Log($"<color=green>[Bot] พบโอกาสชนะ! ซื้อการ์ด ID: {winningCard.data.cardId}</color>");
+            GameLog.Log($"<color=green>[Bot] พบโอกาสชนะ! ซื้อการ์ด ID: {winningCard.data.cardId}</color>");
             PerformBuyAction(winningCard);
             return;
         }
@@ -57,7 +57,7 @@ public class BotController : MonoBehaviour
         CardDisplay bestCard = FindBestAffordableCard(botPlayer);
         if (bestCard != null)
         {
-            Debug.Log($"<color=green>[Bot] ตัดสินใจซื้อการ์ดที่ดีที่สุด ID: {bestCard.data.cardId}</color>");
+            GameLog.Log($"<color=green>[Bot] ตัดสินใจซื้อการ์ดที่ดีที่สุด ID: {bestCard.data.cardId}</color>");
             PerformBuyAction(bestCard);
             return;
         }
@@ -66,7 +66,7 @@ public class BotController : MonoBehaviour
         CardDisplay reserveTarget = FindReserveTarget(botPlayer);
         if (reserveTarget != null)
         {
-            Debug.Log($"<color=yellow>[Bot] ตัดสินใจจองการ์ด Tier 3 ID: {reserveTarget.data.cardId}</color>");
+            GameLog.Log($"<color=yellow>[Bot] ตัดสินใจจองการ์ด Tier 3 ID: {reserveTarget.data.cardId}</color>");
             gameController.PromptReserveCard(reserveTarget);
             gameController.ConfirmReserve(); // บอทกดยืนยันทันที
             return;
@@ -130,7 +130,7 @@ public class BotController : MonoBehaviour
             int colorIdx = needs[i];
             if (gameController.bankCoins[colorIdx] >= 4)
             {
-                Debug.Log($"<color=cyan>[Bot] หยิบเหรียญสี {colorIdx} จำนวน 2 อัน</color>");
+                GameLog.Log($"<color=cyan>[Bot] หยิบเหรียญสี {colorIdx} จำนวน 2 อัน</color>");
                 if (colorMap.TryGetValue(colorIdx, out ResourceButton btn))
                 {
                     gameController.OnResourceClicked(btn);
@@ -155,13 +155,13 @@ public class BotController : MonoBehaviour
 
         if (pickedCount > 0)
         {
-            Debug.Log($"<color=cyan>[Bot] หยิบเหรียญต่างกัน {pickedCount} สี</color>");
+            GameLog.Log($"<color=cyan>[Bot] หยิบเหรียญต่างกัน {pickedCount} สี</color>");
             gameController.EndTurn();
         }
         else
         {
             // ถ้าหยิบไม่ได้เลย (กองกลางว่างหมด) -> ต้องจำใจจองการ์ดซักใบเพื่อเอาทอง (ถ้ามีทอง) หรือข้ามเทิร์น
-            Debug.Log("[Bot] ไม่มีเหรียญให้หยิบ! พยายามจองการ์ดแทน");
+            GameLog.Log("[Bot] ไม่มีเหรียญให้หยิบ! พยายามจองการ์ดแทน");
             CardDisplay anyCard = GetAllCardsOnBoard().FirstOrDefault();
             if (anyCard != null && player.reservedCards.Count < 3)
             {
@@ -170,7 +170,7 @@ public class BotController : MonoBehaviour
             }
             else
             {
-                Debug.Log("[Bot] ทำอะไรไม่ได้เลย -> ข้ามเทิร์น");
+                GameLog.Log("[Bot] ทำอะไรไม่ได้เลย -> ข้ามเทิร์น");
                 gameController.EndTurn();
             }
         }

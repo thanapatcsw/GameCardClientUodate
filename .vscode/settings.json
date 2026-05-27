@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "GameCardClient.slnx"
+    "dotnet.defaultSolution": "GameCardClientUodate.slnx"
 }

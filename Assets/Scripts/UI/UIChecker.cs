@@ -23,7 +23,7 @@ public class UIChecker : MonoBehaviour
                 foreach (var result in results)
                 {
                     // พ่นชื่อวัตถุที่เมาส์จิ้มโดนออกมาดู
-                    Debug.Log("<color=cyan>[UI Hit]</color> เมาส์จิ้มโดน: " + result.gameObject.name);
+                    GameLog.Log("<color=cyan>[UI Hit]</color> เมาส์จิ้มโดน: " + result.gameObject.name);
                 }
             }
         }

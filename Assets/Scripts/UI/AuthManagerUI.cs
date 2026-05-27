@@ -54,7 +54,7 @@ public class AuthManagerUI : MonoBehaviour
             loginButton.onClick.AddListener(OnLoginButtonClicked);
         }
 
-        Debug.Log("[Auth] Ready");
+        GameLog.Log("[Auth] Ready");
     }
 
     // ───── public UI callbacks ─────
@@ -94,13 +94,13 @@ public class AuthManagerUI : MonoBehaviour
     public void OnRegisterButtonClicked()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Auth] OnRegisterButtonClicked called!");
+        GameLog.Log("[Auth] OnRegisterButtonClicked called!");
 
         // ถ้าเป็น http/https → เปิด browser ตรงๆ
         if (!string.IsNullOrWhiteSpace(registerUrl) &&
             (registerUrl.StartsWith("http://") || registerUrl.StartsWith("https://")))
         {
-            Debug.Log("[Auth] Opening web URL: " + registerUrl);
+            GameLog.Log("[Auth] Opening web URL: " + registerUrl);
             try { Application.OpenURL(registerUrl); }
             catch (Exception ex) { Debug.LogError("[Auth] OpenURL error: " + ex.Message); }
             return;
@@ -110,7 +110,7 @@ public class AuthManagerUI : MonoBehaviour
         string fallback = System.IO.Path.Combine(
             Application.streamingAssetsPath, "Web", "index.html");
 
-        Debug.Log("[Auth] Opening local file: " + fallback);
+        GameLog.Log("[Auth] Opening local file: " + fallback);
 
         if (System.IO.File.Exists(fallback))
         {
@@ -184,7 +184,7 @@ public class AuthManagerUI : MonoBehaviour
             if (passwordInput != null)
                 passwordInput.text = "";
 
-            Debug.Log("[Auth] >>> UI UNLOCKED <<<");
+            GameLog.Log("[Auth] >>> UI UNLOCKED <<<");
         }
 
         if (goToScene)
@@ -230,7 +230,7 @@ public class AuthManagerUI : MonoBehaviour
             rect.offsetMax  = Vector2.zero;
 
             _blockerCanvas = canvas;
-            Debug.Log("[Auth] Blocker ON");
+            GameLog.Log("[Auth] Blocker ON");
         }
         else
         {
@@ -238,7 +238,7 @@ public class AuthManagerUI : MonoBehaviour
             {
                 Destroy(_blockerCanvas.gameObject);
                 _blockerCanvas = null;
-                Debug.Log("[Auth] Blocker OFF");
+                GameLog.Log("[Auth] Blocker OFF");
             }
         }
     }

@@ -65,7 +65,7 @@ public class CurrencyManager : MonoBehaviour
         PlayerPrefs.Save();
         OnGemsChanged?.Invoke(Gems);
         _ = PlayerDataService.SaveCurrencyAsync(Gems);
-        Debug.Log($"[CurrencyManager] +{amount} Gems → รวม {Gems}");
+        GameLog.Log($"[CurrencyManager] +{amount} Gems → รวม {Gems}");
     }
 
     public bool SpendGems(int amount)
@@ -73,14 +73,14 @@ public class CurrencyManager : MonoBehaviour
         if (amount <= 0) return true;
         if (Gems < amount)
         {
-            Debug.Log($"[CurrencyManager] Gems ไม่พอ! มี {Gems} ต้องการ {amount}");
+            GameLog.Log($"[CurrencyManager] Gems ไม่พอ! มี {Gems} ต้องการ {amount}");
             return false;
         }
         PlayerPrefs.SetInt(GEMS_KEY, Gems - amount);
         PlayerPrefs.Save();
         OnGemsChanged?.Invoke(Gems);
         _ = PlayerDataService.SaveCurrencyAsync(Gems);
-        Debug.Log($"[CurrencyManager] -{amount} Gems → รวม {Gems}");
+        GameLog.Log($"[CurrencyManager] -{amount} Gems → รวม {Gems}");
         return true;
     }
 
@@ -90,7 +90,7 @@ public class CurrencyManager : MonoBehaviour
     public void SaveEndGameRewards(int earnedGems)
     {
         AddGems(earnedGems);
-        Debug.Log($"[CurrencyManager] รางวัลจบเกม: +{earnedGems} Gems");
+        GameLog.Log($"[CurrencyManager] รางวัลจบเกม: +{earnedGems} Gems");
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ public class CurrencyManager : MonoBehaviour
     public void RefreshFromLocalCache()
     {
         OnGemsChanged?.Invoke(Gems);
-        Debug.Log($"[CurrencyManager] Refreshed from local cache. Gems: {Gems}");
+        GameLog.Log($"[CurrencyManager] Refreshed from local cache. Gems: {Gems}");
     }
 
     /// <summary>

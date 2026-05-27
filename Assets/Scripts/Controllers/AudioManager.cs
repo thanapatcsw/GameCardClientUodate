@@ -56,6 +56,16 @@ namespace StartupCity.Audio
         [Tooltip("เสียงจบเกม - แพ้")]
         public AudioClip gameLoseSFX;
 
+        // ==========================================
+        // 🔈 Volume Control (ปรับเสียง + จำค่าไว้ด้วย PlayerPrefs)
+        // ==========================================
+        private const string BGM_VOLUME_KEY = "Settings_BGMVolume";
+        private const string SFX_VOLUME_KEY = "Settings_SFXVolume";
+
+        // ค่า volume ปัจจุบัน (0..1) อ่านได้จากภายนอกเพื่อตั้งค่าเริ่มต้นให้ slider
+        public float BGMVolume { get; private set; } = 1f;
+        public float SFXVolume { get; private set; } = 1f;
+
         private void Awake()
         {
             if (Instance == null)
@@ -68,6 +78,33 @@ namespace StartupCity.Audio
                 Destroy(gameObject);
                 return;
             }
+
+            // โหลดค่าเสียงที่เคยตั้งไว้ (ถ้าไม่เคยตั้ง = 1 เต็ม)
+            BGMVolume = PlayerPrefs.GetFloat(BGM_VOLUME_KEY, 1f);
+            SFXVolume = PlayerPrefs.GetFloat(SFX_VOLUME_KEY, 1f);
+            ApplyBGMVolume();
+        }
+
+        /// <summary>ปรับระดับเสียงเพลงพื้นหลัง (0..1) แล้วบันทึกค่าไว้</summary>
+        public void SetBGMVolume(float value)
+        {
+            BGMVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(BGM_VOLUME_KEY, BGMVolume);
+            PlayerPrefs.Save();
+            ApplyBGMVolume();
+        }
+
+        /// <summary>ปรับระดับเสียงเอฟเฟกต์ (0..1) แล้วบันทึกค่าไว้</summary>
+        public void SetSFXVolume(float value)
+        {
+            SFXVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(SFX_VOLUME_KEY, SFXVolume);
+            PlayerPrefs.Save();
+        }
+
+        private void ApplyBGMVolume()
+        {
+            if (bgmSource != null) bgmSource.volume = BGMVolume;
         }
 
         private void OnEnable()
@@ -134,7 +171,8 @@ namespace StartupCity.Audio
             if (clip != null && sfxSource != null)
             {
                 // PlayOneShot ช่วยให้เสียงเล่นทับซ้อนกันได้ (เช่นกดปุ่มรัวๆ)
-                sfxSource.PlayOneShot(clip);
+                // คูณด้วย SFXVolume เพื่อให้ slider ตั้งค่าเสียงเอฟเฟกต์ได้
+                sfxSource.PlayOneShot(clip, SFXVolume);
             }
         }
 

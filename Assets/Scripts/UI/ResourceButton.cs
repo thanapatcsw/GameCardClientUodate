@@ -61,7 +61,7 @@ public class ResourceButton : MonoBehaviour, IPointerClickHandler
 
         if (gameController != null)
         {
-            Debug.Log($"<color=green>[ResourceButton]</color> กดเหรียญ: {resourceType}");
+            GameLog.Log($"<color=green>[ResourceButton]</color> กดเหรียญ: {resourceType}");
             gameController.OnResourceClicked(this);
         }
         else

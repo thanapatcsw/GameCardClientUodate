@@ -166,7 +166,7 @@ public class ModeSelectUI : MonoBehaviour
     public void OnClickBotMode()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Mode] Selected bot mode.");
+        GameLog.Log("[Mode] Selected bot mode.");
         PlayerPrefs.SetString("GameMode", "Bot");
         PlayerPrefs.DeleteKey("MatchmakingRoomCode");
         PlayerPrefs.Save();
@@ -176,7 +176,7 @@ public class ModeSelectUI : MonoBehaviour
     public void OnClickRoomMode()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Mode] Selected private room mode.");
+        GameLog.Log("[Mode] Selected private room mode.");
         if (modeSelectPanel != null) modeSelectPanel.SetActive(false);
         if (lobbyPanel != null) lobbyPanel.SetActive(true);
     }
@@ -184,7 +184,7 @@ public class ModeSelectUI : MonoBehaviour
     public void OnClickAutoMatch()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Mode] Selected auto match mode.");
+        GameLog.Log("[Mode] Selected auto match mode.");
 
         if (autoMatchPlayerCountPanel != null)
         {

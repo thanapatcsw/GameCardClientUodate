@@ -58,7 +58,7 @@ public class LobbyUI : MonoBehaviour
         // ซ่อนปุ่ม Start ไว้ก่อนจนกว่าคนจะครบ แต่ปุ่ม Leave ต้องกดได้เสมอ
         if (startButton != null) startButton.SetActive(false);
 
-        Debug.Log($"[Lobby] กำลังสร้างห้อง: {rName}");
+        GameLog.Log($"[Lobby] กำลังสร้างห้อง: {rName}");
         if (FusionManager.Instance != null)
         {
             FusionManager.Instance.StartMatchedGame(rName);
@@ -76,7 +76,7 @@ public class LobbyUI : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Lobby] กำลังเข้าร่วมห้อง: {rName}");
+        GameLog.Log($"[Lobby] กำลังเข้าร่วมห้อง: {rName}");
         _ = FusionManager.Instance.StartGame(GameMode.Client, rName);
     }
 
@@ -150,7 +150,7 @@ public class LobbyUI : MonoBehaviour
     public void OnClickLeaveRoom()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Lobby] ออกจากห้องตัวเอง/การเชื่อมต่อ");
+        GameLog.Log("[Lobby] ออกจากห้องตัวเอง/การเชื่อมต่อ");
         FusionManager.Instance.Disconnect();
         SetViewState(false);
     }
@@ -158,7 +158,7 @@ public class LobbyUI : MonoBehaviour
     public void OnClickStartGame()
     {
         AudioManager.Instance?.PlayButtonClick();
-        Debug.Log("[Lobby] สั่งเริ่มเกม!");
+        GameLog.Log("[Lobby] สั่งเริ่มเกม!");
         if (FusionManager.Instance != null)
         {
             FusionManager.Instance.LoadGameScene();

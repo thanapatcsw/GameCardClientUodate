@@ -54,9 +54,9 @@ public class QuizManager : MonoBehaviour
     public GameController gameController;
 
     // ─── Supabase Quiz Patch Config ───────────────────────────────────────
-    // URL และ Key จะถูกกรอกอัตโนมัติ — ไม่ต้องแก้ใน Inspector
-    private const string SUPABASE_URL     = "https://uwspzhwvjpkcjpoqgkhp.supabase.co";
-    private const string SUPABASE_ANON    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3c3B6aHd2anBrY2pwb3Fna2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzUwMzYsImV4cCI6MjA5MDQxMTAzNn0.hgTN21pBcTD2meqXxKnydit0U7inI3OpMOAFVy9NtEE";
+    // ดึง URL/Key จาก SupabaseConfig ที่เดียว (ไม่ฮาร์ดโค้ดซ้ำ)
+    private const string SUPABASE_URL     = SupabaseConfig.Url;
+    private const string SUPABASE_ANON    = SupabaseConfig.AnonKey;
     private const string CACHE_KEY        = "quiz_cache_v1";
     private const int    CACHE_TTL_HOURS  = 24;  // โหลดใหม่จาก Supabase ทุก 24 ชม.
 
@@ -84,6 +84,7 @@ public class QuizManager : MonoBehaviour
     private bool isQuizActive;
     private bool isWaitingForOnlineResults;
     private int lastSecondTicked = -1;
+    private bool _quizStartRequestedBeforeLoad; // มีการสั่งเริ่มควิซตอน DB ยังโหลดไม่เสร็จ
 
     [Header("---- ข้อความตอบกลับ (Quiz Feedback) ----")]
     public string[] correctFeedbacks = {
@@ -163,7 +164,17 @@ public class QuizManager : MonoBehaviour
         if (questionDatabase == null || questionDatabase.Count == 0)
             Debug.LogError("[Quiz] ไม่มีคำถามในคลัง! ตรวจสอบ Supabase patch หรือ quiz_database.json");
         else
-            Debug.Log($"<color=cyan>[Quiz] Ready: {questionDatabase.Count} questions loaded.</color>");
+        {
+            GameLog.Log($"<color=cyan>[Quiz] Ready: {questionDatabase.Count} questions loaded.</color>");
+
+            // ถ้ามีการสั่งเริ่มควิซไว้ตอน DB ยังโหลดไม่เสร็จ ให้เริ่มตอนนี้
+            if (_quizStartRequestedBeforeLoad)
+            {
+                _quizStartRequestedBeforeLoad = false;
+                GameLog.Log("[Quiz] DB โหลดเสร็จแล้ว → เริ่มควิซที่ค้างไว้");
+                StartQuiz();
+            }
+        }
     }
 
     // ─── Fetch จาก Supabase ─────────────────────────────────────────────
@@ -229,7 +240,7 @@ public class QuizManager : MonoBehaviour
             PlayerPrefs.SetString(CACHE_KEY + "_ts",  System.DateTime.UtcNow.ToString("o"));
             PlayerPrefs.Save();
 
-            Debug.Log($"<color=lime>[Quiz] Supabase: loaded {questionDatabase.Count} questions & cached.</color>");
+            GameLog.Log($"<color=lime>[Quiz] Supabase: loaded {questionDatabase.Count} questions & cached.</color>");
             onDone(true);
         }
     }
@@ -273,7 +284,7 @@ public class QuizManager : MonoBehaviour
             });
         }
 
-        Debug.Log($"<color=yellow>[Quiz] Loaded {questionDatabase.Count} questions from cache (offline).</color>");
+        GameLog.Log($"<color=yellow>[Quiz] Loaded {questionDatabase.Count} questions from cache (offline).</color>");
         return questionDatabase.Count > 0;
     }
 
@@ -308,7 +319,7 @@ public class QuizManager : MonoBehaviour
             });
         }
 
-        Debug.Log($"<color=cyan>[Quiz] Loaded {questionDatabase.Count} questions from local JSON.</color>");
+        GameLog.Log($"<color=cyan>[Quiz] Loaded {questionDatabase.Count} questions from local JSON.</color>");
     }
 
 
@@ -369,7 +380,9 @@ public class QuizManager : MonoBehaviour
 
         if (questionDatabase == null || questionDatabase.Count == 0)
         {
-            Debug.LogError("ยังไม่ได้ใส่คำถามใน Database!");
+            // DB ยังโหลดไม่เสร็จ (โหลดแบบ async ใน Awake) — จำคำขอไว้ แล้วเริ่มอัตโนมัติเมื่อโหลดเสร็จ
+            Debug.LogWarning("[Quiz] Database ยังโหลดไม่เสร็จ — จะเริ่มควิซให้อัตโนมัติเมื่อโหลดเสร็จ");
+            _quizStartRequestedBeforeLoad = true;
             return;
         }
 
@@ -412,7 +425,7 @@ public class QuizManager : MonoBehaviour
         if (usedQuestionIds.Count >= questionDatabase.Count)
         {
             usedQuestionIds.Clear();
-            Debug.Log("<color=cyan>[Quiz] All questions used. Resetting pool.</color>");
+            GameLog.Log("<color=cyan>[Quiz] All questions used. Resetting pool.</color>");
         }
 
         // Build list of available indices
@@ -527,7 +540,7 @@ public class QuizManager : MonoBehaviour
 
         if (currentAnswers.Count == 0)
         {
-            Debug.Log("<color=red>หมดเวลา! ไม่มีใครตอบเลย</color>");
+            GameLog.Log("<color=red>หมดเวลา! ไม่มีใครตอบเลย</color>");
         }
 
         List<int> rewardGemIndices = DetermineRewardGemIndices(currentAnswers);
@@ -573,7 +586,7 @@ public class QuizManager : MonoBehaviour
                 int randomTargetIndex = Random.Range(1, totalPlayers); 
                 rankedPlayers.Insert(Mathf.Min(randomTargetIndex, rankedPlayers.Count), myAns);
                 
-                Debug.Log($"[Quiz] Bot Mode & Incorrect: Player randomized to rank {rankedPlayers.IndexOf(myAns) + 1}");
+                GameLog.Log($"[Quiz] Bot Mode & Incorrect: Player randomized to rank {rankedPlayers.IndexOf(myAns) + 1}");
             }
         }
 
@@ -583,11 +596,11 @@ public class QuizManager : MonoBehaviour
             return;
         }
 
-        Debug.Log("\n<color=yellow>=== สรุปผลการตอบคำถาม ===</color>");
+        GameLog.Log("\n<color=yellow>=== สรุปผลการตอบคำถาม ===</color>");
         for (int i = 0; i < rankedPlayers.Count; i++)
         {
             PlayerAnswer answer = rankedPlayers[i];
-            Debug.Log($"อันดับ {i + 1}: ผู้เล่น {answer.playerIndex + 1} ตอบถูก: {answer.isCorrect} เวลา: {answer.timeTaken:F2} s");
+            GameLog.Log($"อันดับ {i + 1}: ผู้เล่น {answer.playerIndex + 1} ตอบถูก: {answer.isCorrect} เวลา: {answer.timeTaken:F2} s");
         }
 
         PlayerAnswer winner = rankedPlayers[0];
@@ -752,7 +765,11 @@ public class QuizManager : MonoBehaviour
         if (timeBarFill != null) timeBarFill.fillAmount = 1f;
 
         // UI Setup
-        if (questionText != null) questionText.text = currentQuestion.questionText;
+        if (questionText != null)
+        {
+            questionText.text = currentQuestion.questionText;
+            EnableAutoFit(questionText, 16f); // ย่อ font อัตโนมัติถ้าคำถามยาวเกินกรอบ
+        }
 
         if (answerButtons == null || answerButtons.Length == 0)
         {
@@ -778,6 +795,7 @@ public class QuizManager : MonoBehaviour
             if (btnText != null && i < currentQuestion.choices.Length)
             {
                 btnText.text = currentQuestion.choices[i];
+                EnableAutoFit(btnText, 12f); // ย่อ font อัตโนมัติถ้าคำตอบยาวเกินปุ่ม
             }
 
             answerButtons[i].interactable = true;
@@ -792,7 +810,21 @@ public class QuizManager : MonoBehaviour
         if (gameController != null) gameController.SetGameplayInputLocked(true);
         if (quizPanel != null) quizPanel.SetActive(true);
 
-        Debug.Log($"<color=white>เปิดควิซ (Shuffle แล้ว): {currentQuestion.questionText}</color>");
+        GameLog.Log($"<color=white>เปิดควิซ (Shuffle แล้ว): {currentQuestion.questionText}</color>");
+    }
+
+    // เปิด TMP Auto Size: เก็บขนาด font ดีไซน์เดิมไว้เป็นเพดานบน (ครั้งแรก) แล้วให้ย่อลงได้ถ้าข้อความยาวเกินกรอบ
+    private void EnableAutoFit(TMP_Text text, float minSize)
+    {
+        if (text == null) return;
+
+        if (!text.enableAutoSizing)
+        {
+            if (text.fontSize > 0f) text.fontSizeMax = text.fontSize; // คงขนาดดีไซน์เป็นเพดานบน ย่อลงได้เท่านั้น
+            text.enableAutoSizing = true;
+        }
+
+        text.fontSizeMin = minSize;
     }
 
     private void PrepareClientWaitingForQuizStart()
@@ -1110,10 +1142,29 @@ public class QuizManager : MonoBehaviour
         FusionManager.Instance.QuizStartedReceived -= HandleRemoteQuizStarted;
         FusionManager.Instance.QuizAnswerReceived -= HandleRemoteQuizAnswer;
         FusionManager.Instance.QuizResultsReceived -= HandleRemoteQuizResults;
+        FusionManager.Instance.QuizStartRequested -= HandleQuizStartRequested;
 
         FusionManager.Instance.QuizStartedReceived += HandleRemoteQuizStarted;
         FusionManager.Instance.QuizAnswerReceived += HandleRemoteQuizAnswer;
         FusionManager.Instance.QuizResultsReceived += HandleRemoteQuizResults;
+        FusionManager.Instance.QuizStartRequested += HandleQuizStartRequested;
+    }
+
+    // host รับคำขอจาก client → เริ่มควิซ (host branch จะเลือกคำถาม + broadcast ให้ทุกคน)
+    private void HandleQuizStartRequested()
+    {
+        if (!IsOnlineQuizHost())
+        {
+            return;
+        }
+
+        if (isQuizActive)
+        {
+            return; // กันเริ่มซ้ำถ้ามีหลายคำขอ
+        }
+
+        GameLog.Log("[Quiz] Host ได้รับคำขอเริ่มควิซจาก client → เริ่มและ broadcast");
+        StartQuiz();
     }
 
     private void UnsubscribeNetworkEvents()
@@ -1126,6 +1177,7 @@ public class QuizManager : MonoBehaviour
         FusionManager.Instance.QuizStartedReceived -= HandleRemoteQuizStarted;
         FusionManager.Instance.QuizAnswerReceived -= HandleRemoteQuizAnswer;
         FusionManager.Instance.QuizResultsReceived -= HandleRemoteQuizResults;
+        FusionManager.Instance.QuizStartRequested -= HandleQuizStartRequested;
     }
 
     private string GetGemName(int index)

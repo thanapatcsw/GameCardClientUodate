@@ -93,7 +93,7 @@ public static class CardDatabaseLoader
         }
 
         isLoaded = true;
-        Debug.Log($"[CardDatabaseLoader] โหลดการ์ดสำเร็จ! รวม {allCards.Count} ใบ (T1:{tier1.Count} T2:{tier2.Count} T3:{tier3.Count})");
+        GameLog.Log($"[CardDatabaseLoader] โหลดการ์ดสำเร็จ! รวม {allCards.Count} ใบ (T1:{tier1.Count} T2:{tier2.Count} T3:{tier3.Count})");
     }
 
     // ---- JSON mapping classes ----

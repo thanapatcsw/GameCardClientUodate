@@ -72,7 +72,7 @@ public class CanvasSparkleSpawner : MonoBehaviour
             rectTransform.anchorMax = Vector2.one;
             rectTransform.offsetMin = Vector2.zero;
             rectTransform.offsetMax = Vector2.zero;
-            Debug.Log("[CanvasSparkleSpawner] Automatically stretched RectTransform anchors to Full Screen.");
+            GameLog.Log("[CanvasSparkleSpawner] Automatically stretched RectTransform anchors to Full Screen.");
         }
         
         // If no sprite is selected, generate a soft glow dot texture programmatically
@@ -81,7 +81,7 @@ public class CanvasSparkleSpawner : MonoBehaviour
             GenerateDefaultGlowSprite();
         }
 
-        Debug.Log("[CanvasSparkleSpawner] Initialized successfully.");
+        GameLog.Log("[CanvasSparkleSpawner] Initialized successfully.");
     }
 
     private void Start()
@@ -94,7 +94,7 @@ public class CanvasSparkleSpawner : MonoBehaviour
             {
                 SpawnSparkle(preWarmed: true);
             }
-            Debug.Log($"[CanvasSparkleSpawner] Pre-warmed screen with {initialCount} sparkles scattered across the screen.");
+            GameLog.Log($"[CanvasSparkleSpawner] Pre-warmed screen with {initialCount} sparkles scattered across the screen.");
         }
     }
 

@@ -20,6 +20,10 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     public event Action<QuizAnswerSnapshot> QuizAnswerReceived;
     public event Action<List<QuizAnswerSnapshot>, List<int>> QuizResultsReceived;
     public event Action<EconomyStateSnapshot> EconomyStateReceived;
+    public event Action<BoardStateSnapshot> BoardStateReceived;
+    public event Action QuizStartRequested;
+    // late-joiner ขอ full state จาก host — ส่ง playerId ของคนที่ขอ เพื่อให้ host ตอบกลับเฉพาะคนนั้น
+    public event Action<int> FullStateRequested;
 
     private const char PlayerNameSeparator = '|';
     private const string PlayerNameMessageType = "NAME";
@@ -28,6 +32,9 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     private const string QuizAnswerMessageType = "QUIZANSWER";
     private const string QuizResultMessageType = "QUIZRESULT";
     private const string EconomyStateMessageType = "ECON";
+    private const string BoardStateMessageType = "BOARD";
+    private const string QuizRequestMessageType = "QUIZREQ";
+    private const string StateRequestMessageType = "STATEREQ";
     private NetworkRunner _runner;
     private NetworkSceneManagerDefault _sceneManager;
     private readonly Dictionary<int, string> _playerNames = new Dictionary<int, string>();
@@ -53,6 +60,17 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     {
         public int[] BankCoins;
         public EconomyPlayerSnapshot[] Players;
+    }
+
+    // สถานะการ์ดบนกระดาน (face-up market) สำหรับ sync ออนไลน์
+    // แต่ละ tier เก็บ cardId ตามลำดับช่อง (string.Empty = ช่องว่าง)
+    // UsedCardIds = cardId ทั้งหมดที่ถูกจั่วออกจากกอง (กันการ์ดซ้ำ/เพี้ยนข้ามเครื่อง)
+    public struct BoardStateSnapshot
+    {
+        public string[] Tier1CardIds;
+        public string[] Tier2CardIds;
+        public string[] Tier3CardIds;
+        public string[] UsedCardIds;
     }
 
     [Header("---- Scene Names ----")]
@@ -133,7 +151,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (result.Ok)
         {
-            Debug.Log($"[Fusion] Started session successfully: {roomName} (Mode: {mode})");
+            GameLog.Log($"[Fusion] Started session successfully: {roomName} (Mode: {mode})");
             
             if (_runner != null && _runner.IsServer && SupabaseManager.Instance != null && SupabaseManager.Instance.IsInitialized)
             {
@@ -164,7 +182,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
     {
-        Debug.Log($"[Fusion] Player joined: {player}");
+        GameLog.Log($"[Fusion] Player joined: {player}");
 
         RegisterPlayerName(runner.LocalPlayer.PlayerId, GetLocalPlayerName(runner.LocalPlayer.PlayerId));
 
@@ -189,7 +207,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
     {
-        Debug.Log($"[Fusion] Player left: {player}");
+        GameLog.Log($"[Fusion] Player left: {player}");
         if (_playerNames.Remove(player.PlayerId))
         {
             NotifyPlayerNamesUpdated();
@@ -217,7 +235,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
     {
-        Debug.Log($"[Fusion] Runner shutdown: {shutdownReason}");
+        GameLog.Log($"[Fusion] Runner shutdown: {shutdownReason}");
         if (runner == _runner)
         {
             CleanupRunnerComponents();
@@ -227,12 +245,12 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnConnectedToServer(NetworkRunner runner)
     {
-        Debug.Log("[Fusion] Connected to server successfully.");
+        GameLog.Log("[Fusion] Connected to server successfully.");
     }
 
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
     {
-        Debug.Log($"[Fusion] Disconnected from server: {reason}");
+        GameLog.Log($"[Fusion] Disconnected from server: {reason}");
     }
 
     public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
@@ -323,6 +341,29 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
+        if (string.Equals(parts[0], QuizRequestMessageType, StringComparison.Ordinal))
+        {
+            // เฉพาะ host เท่านั้นที่ตอบสนองคำขอเริ่มควิซ (client เป็นคนส่งมา)
+            if (runner.IsServer)
+            {
+                QuizStartRequested?.Invoke();
+            }
+
+            return;
+        }
+
+        if (string.Equals(parts[0], StateRequestMessageType, StringComparison.Ordinal))
+        {
+            // เฉพาะ host เท่านั้นที่ตอบสนองคำขอ full state (late-joiner เป็นคนส่งมา)
+            // ส่ง playerId ของคนขอไปด้วย เพื่อให้ host ตอบกลับเฉพาะคนนั้น (ไม่รีเซ็ต timer คนอื่น)
+            if (runner.IsServer)
+            {
+                FullStateRequested?.Invoke(player.PlayerId);
+            }
+
+            return;
+        }
+
         if (string.Equals(parts[0], QuizAnswerMessageType, StringComparison.Ordinal))
         {
             if (!runner.IsServer || parts.Length < 4 || !int.TryParse(parts[1], out int answerPlayerIndex))
@@ -387,6 +428,39 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             else
             {
                 EconomyStateReceived?.Invoke(snapshot);
+            }
+
+            return;
+        }
+
+        if (string.Equals(parts[0], BoardStateMessageType, StringComparison.Ordinal))
+        {
+            if (parts.Length < 5)
+            {
+                return;
+            }
+
+            BoardStateSnapshot boardSnapshot = new BoardStateSnapshot
+            {
+                Tier1CardIds = DecodeStringArray(parts[1]),
+                Tier2CardIds = DecodeStringArray(parts[2]),
+                Tier3CardIds = DecodeStringArray(parts[3]),
+                UsedCardIds = DecodeStringArray(parts[4])
+            };
+
+            BoardStateReceived?.Invoke(boardSnapshot);
+
+            if (runner.IsServer)
+            {
+                foreach (var activePlayer in runner.ActivePlayers)
+                {
+                    if (activePlayer == player || activePlayer == runner.LocalPlayer)
+                    {
+                        continue;
+                    }
+
+                    runner.SendReliableDataToPlayer(activePlayer, default, data.ToArray());
+                }
             }
 
             return;
@@ -562,6 +636,134 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         _runner.SendReliableDataToServer(default, payload);
     }
 
+    public void SendBoardState(BoardStateSnapshot snapshot)
+    {
+        if (_runner == null)
+        {
+            return;
+        }
+
+        byte[] payload = BuildBoardPayload(snapshot);
+
+        if (_runner.IsServer)
+        {
+            foreach (var activePlayer in _runner.ActivePlayers)
+            {
+                if (activePlayer == _runner.LocalPlayer)
+                {
+                    continue;
+                }
+
+                _runner.SendReliableDataToPlayer(activePlayer, default, payload);
+            }
+
+            return;
+        }
+
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    // client ขอให้ host เริ่มควิซ (เมื่อ client เป็นคนจบเทิร์นที่ถึงรอบควิซ)
+    public void RequestQuizStart()
+    {
+        if (_runner == null)
+        {
+            return;
+        }
+
+        byte[] payload = Encoding.UTF8.GetBytes(QuizRequestMessageType);
+
+        if (_runner.IsServer)
+        {
+            // host เรียกเองได้โดยตรง ไม่ต้องส่งผ่าน network
+            QuizStartRequested?.Invoke();
+            return;
+        }
+
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    // client (late-joiner) ขอ full state ปัจจุบันจาก host
+    public void RequestFullState()
+    {
+        if (_runner == null || _runner.IsServer)
+        {
+            return; // host มี state ครบอยู่แล้ว ไม่ต้องขอ
+        }
+
+        byte[] payload = Encoding.UTF8.GetBytes(StateRequestMessageType);
+        _runner.SendReliableDataToServer(default, payload);
+    }
+
+    // host ตอบกลับ full state เฉพาะ player ที่ขอ (ส่งเจาะจง ไม่ broadcast — กันรีเซ็ต timer คนที่กำลังเล่นอยู่)
+    public void SendBoardStateToPlayer(int playerId, BoardStateSnapshot snapshot)
+    {
+        if (_runner == null || !_runner.IsServer || !TryGetPlayerRef(playerId, out PlayerRef target))
+        {
+            return;
+        }
+
+        _runner.SendReliableDataToPlayer(target, default, BuildBoardPayload(snapshot));
+    }
+
+    public void SendEconomyStateToPlayer(int playerId, EconomyStateSnapshot snapshot)
+    {
+        if (_runner == null || !_runner.IsServer || !TryGetPlayerRef(playerId, out PlayerRef target))
+        {
+            return;
+        }
+
+        _runner.SendReliableDataToPlayer(target, default, BuildEconomyPayload(snapshot));
+    }
+
+    public void SendTurnStateToPlayer(int playerId, int currentPlayerIndex, int currentRound, int totalTurnCount, int currentTurnDisplay)
+    {
+        if (_runner == null || !_runner.IsServer || !TryGetPlayerRef(playerId, out PlayerRef target))
+        {
+            return;
+        }
+
+        _runner.SendReliableDataToPlayer(target, default,
+            EncodeTurnStatePayload(currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay));
+    }
+
+    private bool TryGetPlayerRef(int playerId, out PlayerRef result)
+    {
+        if (_runner != null)
+        {
+            foreach (var activePlayer in _runner.ActivePlayers)
+            {
+                if (activePlayer.PlayerId == playerId)
+                {
+                    result = activePlayer;
+                    return true;
+                }
+            }
+        }
+
+        result = default;
+        return false;
+    }
+
+    private static byte[] BuildBoardPayload(BoardStateSnapshot snapshot)
+    {
+        return Encoding.UTF8.GetBytes(string.Join(
+            PlayerNameSeparator.ToString(),
+            BoardStateMessageType,
+            EncodeStringArray(snapshot.Tier1CardIds),
+            EncodeStringArray(snapshot.Tier2CardIds),
+            EncodeStringArray(snapshot.Tier3CardIds),
+            EncodeStringArray(snapshot.UsedCardIds)));
+    }
+
+    private static byte[] BuildEconomyPayload(EconomyStateSnapshot snapshot)
+    {
+        string bankPayload = EncodeIntArray(snapshot.BankCoins);
+        string playersPayload = EncodeEconomyPlayers(snapshot.Players);
+        return Encoding.UTF8.GetBytes(
+            $"{EconomyStateMessageType}{PlayerNameSeparator}{bankPayload}{PlayerNameSeparator}{playersPayload}");
+    }
+
     public void SendQuizStart(int questionIndex)
     {
         if (_runner == null || !_runner.IsServer)
@@ -625,10 +827,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
-        string bankPayload = EncodeIntArray(snapshot.BankCoins);
-        string playersPayload = EncodeEconomyPlayers(snapshot.Players);
-        byte[] payload = Encoding.UTF8.GetBytes(
-            $"{EconomyStateMessageType}{PlayerNameSeparator}{bankPayload}{PlayerNameSeparator}{playersPayload}");
+        byte[] payload = BuildEconomyPayload(snapshot);
 
         if (_runner.IsServer)
         {
@@ -941,6 +1140,36 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         for (int i = 0; i < parts.Length; i++)
         {
             int.TryParse(parts[i], out values[i]);
+        }
+
+        return values;
+    }
+
+    // cardId ไม่มี ',' หรือ '|' อยู่แล้ว ใช้ '-' แทนช่องว่าง
+    private const string EmptyCardSlotToken = "-";
+
+    private static string EncodeStringArray(IEnumerable<string> values)
+    {
+        if (values == null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(",", values.Select(v => string.IsNullOrEmpty(v) ? EmptyCardSlotToken : v));
+    }
+
+    private static string[] DecodeStringArray(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return System.Array.Empty<string>();
+        }
+
+        string[] parts = payload.Split(',');
+        string[] values = new string[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+        {
+            values[i] = parts[i] == EmptyCardSlotToken ? string.Empty : parts[i];
         }
 
         return values;

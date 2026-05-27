@@ -94,7 +94,7 @@ public class CardDisplay : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         if (gameController == null) gameController = FindFirstObjectByType<GameController>();
         if (gameController == null) return;
 
-        Debug.Log($"[แตะสั้นๆ] สั่งซื้อการ์ด ID: {data.cardId}");
+        GameLog.Log($"[แตะสั้นๆ] สั่งซื้อการ์ด ID: {data.cardId}");
 
         if (isReserved) {
             gameController.BuyReservedCard(this);
@@ -110,7 +110,7 @@ public class CardDisplay : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         if (gameController == null) return;
 
         if (!isReserved) {
-            Debug.Log($"[กดค้าง] เรียกหน้าต่างจองการ์ด ID: {data.cardId}");
+            GameLog.Log($"[กดค้าง] เรียกหน้าต่างจองการ์ด ID: {data.cardId}");
             gameController.PromptReserveCard(this);
         }
     }

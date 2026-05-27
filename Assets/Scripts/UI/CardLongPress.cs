@@ -26,7 +26,7 @@ public class CardLongPress : MonoBehaviour, IPointerDownHandler, IPointerUpHandl
             {
                 isLongPressTriggered = true;
                 onLongPress.Invoke(); // เรียกใช้งานคำสั่งที่ผูกไว้
-                Debug.Log("จองการ์ดใบนี้!");
+                GameLog.Log("จองการ์ดใบนี้!");
             }
         }
     }

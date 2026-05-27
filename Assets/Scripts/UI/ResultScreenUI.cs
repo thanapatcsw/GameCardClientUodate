@@ -152,7 +152,7 @@ public class ResultScreenUI : MonoBehaviour
             else               AudioManager.Instance?.PlayGameLose();
         }
 
-        Debug.Log($"[ResultUI] แสดงหน้าจอ {(isGameOver ? "Match" : "Quiz")}: {title}");
+        GameLog.Log($"[ResultUI] แสดงหน้าจอ {(isGameOver ? "Match" : "Quiz")}: {title}");
     }
 
     public void OnActionButtonClick()
@@ -170,7 +170,7 @@ public class ResultScreenUI : MonoBehaviour
 
         if (isGameOver)
         {
-            Debug.Log("[ResultUI] กลับหน้าเมนู...");
+            GameLog.Log("[ResultUI] กลับหน้าเมนู...");
             CloseOnlineRoomAndClearMatchState();
             SceneManager.LoadScene("MainMenu 1"); 
         }

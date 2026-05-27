@@ -38,7 +38,7 @@ public static class RankSceneBootstrap
         var go = new GameObject("EventSystem");
         go.AddComponent<EventSystem>();
         go.AddComponent<StandaloneInputModule>();
-        Debug.Log("[RankSceneBootstrap] EventSystem created.");
+        GameLog.Log("[RankSceneBootstrap] EventSystem created.");
     }
 
     private static void EnsureRankUI()
@@ -69,6 +69,6 @@ public static class RankSceneBootstrap
         var rankUi = go.AddComponent<RankUI>();
         // หลังกด BACK ใน RankScene → กลับไป Main Menu
         rankUi.backSceneName = "MainMenu 1";
-        Debug.Log("[RankSceneBootstrap] RankUI spawned in RankScene.");
+        GameLog.Log("[RankSceneBootstrap] RankUI spawned in RankScene.");
     }
 }

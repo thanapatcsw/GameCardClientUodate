@@ -393,7 +393,7 @@ public class DailyQuizManager : MonoBehaviour
             t.color = targetColor;
         }
 
-        Debug.Log($"[DailyQuiz] Category: {category} (Force Updated all Text components to {targetColor})");
+        GameLog.Log($"[DailyQuiz] Category: {category} (Force Updated all Text components to {targetColor})");
     }
 
     private void ShowResult(bool success, string customMsg = "")
@@ -418,23 +418,21 @@ public class DailyQuizManager : MonoBehaviour
             // เล่นเสียงถูกผ่าน AudioManager (ถ้ายังไม่ได้เล่นจาก SubmitDailyAnswer)
             // AudioManager.Instance?.PlayCorrectAnswer();  // ← uncomment ถ้า ShowResult ถูกเรียกโดยตรง
 
+            // อัปเดต local เพื่อโชว์ผลทันที (optimistic)
             if (CurrencyManager.Instance != null)
             {
                 CurrencyManager.Instance.AddGems(gemReward);
             }
             else
             {
-                // Fallback: อัปเดต PlayerPrefs โดยตรงถ้าไม่มี CurrencyManager
-                int currentGems = PlayerPrefs.GetInt("TotalGems", 0);
-                int newTotal = currentGems + gemReward;
+                int newTotal = PlayerPrefs.GetInt("TotalGems", 0) + gemReward;
                 PlayerPrefs.SetInt("TotalGems", newTotal);
                 PlayerPrefs.Save();
-                
-                // บันทึกลง Database ด้วย (ถ้าล็อกอินอยู่)
-                _ = PlayerDataService.SaveCurrencyAsync(newTotal);
-                
-                Debug.Log($"[DailyQuiz] Added {gemReward} gems (Total: {newTotal}) to PlayerPrefs & Database (Fallback)");
             }
+
+            // เขียน DB แบบ server-authoritative: server กำหนดจำนวน + กันรับซ้ำ/วัน
+            // (ถ้า server ปฏิเสธ เช่นรับไปแล้ววันนี้ ค่าจะถูก reconcile ตอนโหลดโปรไฟล์ครั้งถัดไป)
+            _ = PlayerDataService.GrantQuizRewardAsync();
         }
         else
         {
@@ -477,7 +475,7 @@ public class DailyQuizManager : MonoBehaviour
 
     private IEnumerator FadeOutAndLoad(string sceneName)
     {
-        Debug.Log($"[DailyQuiz] Attempting to load scene: {sceneName}");
+        GameLog.Log($"[DailyQuiz] Attempting to load scene: {sceneName}");
 
         if (mainCanvasGroup != null)
         {

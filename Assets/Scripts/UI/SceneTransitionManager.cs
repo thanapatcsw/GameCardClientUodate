@@ -13,37 +13,37 @@ public class SceneTransitionManager : MonoBehaviour
     // ฟังก์ชันสำหรับใช้ผูกกับปุ่ม OnClick() ใน Unity
     public void GoToMainMenu()
     {
-        Debug.Log($"กำลังโหลดหน้า: {mainMenuSceneName}");
+        GameLog.Log($"กำลังโหลดหน้า: {mainMenuSceneName}");
         SceneManager.LoadScene(mainMenuSceneName);
     }
 
     public void GoToGame()
     {
-        Debug.Log($"กำลังโหลดหน้า: {gameSceneName}");
+        GameLog.Log($"กำลังโหลดหน้า: {gameSceneName}");
         SceneManager.LoadScene(gameSceneName);
     }
 
     public void GoToStore()
     {
-        Debug.Log($"กำลังโหลดหน้า: {storeSceneName}");
+        GameLog.Log($"กำลังโหลดหน้า: {storeSceneName}");
         SceneManager.LoadScene(storeSceneName);
     }
 
     public void GoToRank()
     {
-        Debug.Log($"กำลังโหลดหน้า: {rankSceneName}");
+        GameLog.Log($"กำลังโหลดหน้า: {rankSceneName}");
         SceneManager.LoadScene(rankSceneName);
     }
 
     public void GoToTutorial()
     {
-        Debug.Log($"กำลังโหลดหน้า: {tutorialSceneName}");
+        GameLog.Log($"กำลังโหลดหน้า: {tutorialSceneName}");
         SceneManager.LoadScene(tutorialSceneName);
     }
 
     public void QuitGame()
     {
-        Debug.Log("ออกจากการเล่นเกม");
+        GameLog.Log("ออกจากการเล่นเกม");
         Application.Quit();
         
         // ถ้าใช้ในด่าน Editor ให้หยุดรัน
