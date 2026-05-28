@@ -110,7 +110,23 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         {
             string sceneToLoad = string.IsNullOrEmpty(gameSceneName) ? "SampleScene" : gameSceneName;
             _runner.LoadScene(ResolveSceneRef(sceneToLoad), UnityEngine.SceneManagement.LoadSceneMode.Single);
+
+            // snapshot ผู้เล่นที่อยู่จริงตอนเกมเริ่ม + อัปเดต status='playing' ในครั้งเดียว
+            // (ไม่ sync ทุก join/leave เพราะ DB เก็บไว้เป็นบันทึกแมตช์ ไม่ใช่สถานะ lobby realtime)
+            SetRoomStatus("playing", _runner.ActivePlayers.Count());
         }
+    }
+
+    // host-only helper สำหรับอัปเดตสถานะห้องใน Supabase (waiting → playing → finished)
+    // ส่ง playerCount มาด้วยถ้าต้อง snapshot จำนวนผู้เล่นที่อยู่ขณะนั้น
+    public void SetRoomStatus(string status, int? playerCount = null)
+    {
+        if (_runner == null || !_runner.IsServer) return;
+        string roomCode = _runner.SessionInfo?.Name;
+        if (string.IsNullOrEmpty(roomCode)) return;
+        if (SupabaseManager.Instance == null || !SupabaseManager.Instance.IsInitialized) return;
+
+        _ = PlayerDataService.CreateRoomAsync(roomCode, playerCount: playerCount, status: status);
     }
 
     public async Task StartGame(GameMode mode, string roomName, string sceneToLoad = null)
@@ -155,7 +171,8 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             
             if (_runner != null && _runner.IsServer && SupabaseManager.Instance != null && SupabaseManager.Instance.IsInitialized)
             {
-                _ = SupabaseManager.Instance.CreateRoom(roomName, roomName, 1);
+                // server-authoritative: ผ่าน Edge Function (service_role) แทนการ insert ตรงจาก client ที่ติด RLS
+                _ = PlayerDataService.CreateRoomAsync(roomName, roomName, 1);
             }
 
             // [ต่อปลั๊ก!] สั่งให้ LobbyUI แสดงหน้า RoomInfoView และโชว์รหัสห้อง
@@ -203,6 +220,8 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
         RefreshPlayerList(runner);
         NotifyActivePlayersChanged();
+        // ไม่ sync player_count ขึ้น DB ทุกครั้ง — รอ snapshot ตอน LoadGameScene
+        // (lobby UI อ่านจาก Fusion ตรงอยู่แล้ว, DB เก็บไว้เป็น "บันทึกแมตช์")
     }
 
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)

@@ -110,7 +110,7 @@ public static class PlayerDataService
                 LocalProfile = result;
                 SyncToLocalCache(result);
                 
-                // แจ้งเตือน UI ให้รีเฟรชค่า Gems/Coins
+                // แจ้งเตือน UI ให้รีเฟรชค่า Gems
                 if (CurrencyManager.Instance != null)
                 {
                     CurrencyManager.Instance.RefreshFromLocalCache();
@@ -275,6 +275,41 @@ public static class PlayerDataService
     public static async Task EquipFrameAsync(string itemId)
     {
         await CallAuthedFnAsync("equip-cosmetic", $"{{\"equippedFrame\":\"{itemId}\"}}");
+    }
+
+    /// <summary>
+    /// Upsert ห้องเกมผ่าน Edge Function (server-authoritative)
+    /// แทนการ insert ตรงจาก client ที่ติด RLS rooms_public_read
+    /// • ครั้งแรก (ห้องยังไม่มี): ต้องส่งครบ — sessionName, playerCount, status
+    /// • อัปเดตเฉพาะบาง field: ส่งเฉพาะ field ที่เปลี่ยน (ตัวอื่นเป็น null)
+    /// </summary>
+    public static async Task<bool> CreateRoomAsync(
+        string roomCode,
+        string sessionName = null,
+        int? playerCount = null,
+        string status = null)
+    {
+        if (string.IsNullOrEmpty(roomCode))
+        {
+            Debug.LogWarning("[PlayerData] CreateRoom — roomCode is empty");
+            return false;
+        }
+
+        // ประกอบ JSON เฉพาะ field ที่มีค่า (ฝั่ง server จะ partial-update)
+        var parts = new List<string> { $"\"roomCode\":\"{roomCode}\"" };
+        if (sessionName != null) parts.Add($"\"sessionName\":\"{sessionName}\"");
+        if (playerCount.HasValue) parts.Add($"\"playerCount\":{Mathf.Clamp(playerCount.Value, 1, 4)}");
+        if (status != null) parts.Add($"\"status\":\"{status}\"");
+        string body = "{" + string.Join(",", parts) + "}";
+
+        var (ok, httpStatus, respBody) = await CallAuthedFnAsync("create-room", body);
+        if (!ok)
+        {
+            Debug.LogWarning($"[PlayerData] create-room failed ({httpStatus}): {respBody}");
+            return false;
+        }
+        GameLog.Log($"<color=green>✅ [PlayerData] upsert ห้อง [{roomCode}] สำเร็จ</color>");
+        return true;
     }
 
     public static async Task<List<PlayerProfile>> GetLeaderboardAsync(int limit = 50)

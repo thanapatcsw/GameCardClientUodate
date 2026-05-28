@@ -1041,7 +1041,10 @@ public class GameController : MonoBehaviour
         
         if (winner != null) {
             isGameOver = true;
-            
+
+            // อัปเดตสถานะห้องใน Supabase เป็น 'finished' (host เท่านั้น — เมธอด check เอง)
+            FusionManager.Instance?.SetRoomStatus("finished");
+
             // --- บันทึกสถิติ Coins และ Points เก็บไว้แสดงที่หน้า Main Menu ---
             int localSeatIndex = GetLocalPlayerUiIndex();
             if (localSeatIndex >= 0 &&

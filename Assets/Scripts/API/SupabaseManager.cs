@@ -127,36 +127,9 @@ public class SupabaseManager : MonoBehaviour
         return "Player 1";
     }
 
-    // [Legacy] Private room / manual flows may still use this helper, but Auto Match no longer
-    // relies on client-side inserts here. Server-side matchmaking now creates room metadata.
-    public async Task<bool> CreateRoom(string roomCode, string sessionName, int playerCount = 1)
-    {
-        try
-        {
-            if (supabaseClient == null) return false;
-
-            var room = new RoomData
-            {
-                RoomCode = roomCode,
-                SessionName = sessionName,
-                HostName = GetCurrentUsername(),
-                PlayerCount = Mathf.Clamp(playerCount, 1, 4),
-                Status = "waiting",
-                CreatedAt = DateTime.UtcNow
-            };
-
-            // บันทึกลงตาราง "rooms"
-            await supabaseClient.From<RoomData>().Insert(room);
-            
-            GameLog.Log($"<color=green>✅ [Supabase] บันทึกห้อง [{roomCode}] ลงใน Database สำเร็จ!</color>");
-            return true;
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"<color=red>❌ [Supabase] สร้างห้องไม่สำเร็จ: {ex.Message}</color>");
-            return false;
-        }
-    }
+    // หมายเหตุ: เดิมเคยมี CreateRoom() ที่ insert ลง public.rooms ตรงจาก client
+    // ย้ายไป Edge Function แล้ว → ใช้ PlayerDataService.CreateRoomAsync() แทน
+    // (server-authoritative, ใช้ service_role bypass RLS rooms_public_read)
 
     // ฟังก์ชันสำหรับออกจากระบบ
     public async Task SignOut()
