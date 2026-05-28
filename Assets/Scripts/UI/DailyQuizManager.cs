@@ -270,12 +270,14 @@ public class DailyQuizManager : MonoBehaviour
         
         bool isCorrect = (choiceIndex == _shuffledCorrectIndex);
         
-        // เล่นเสียงผ่าน AudioManager หลัก (Singleton)
-        if (isCorrect) AudioManager.Instance?.PlayCorrectAnswer();
-        else           AudioManager.Instance?.PlayWrongAnswer();
-
-        // Fallback: เล่นผ่าน local AudioSource ถ้า Assign ไว้ตรง Inspector
-        if (audioSource != null)
+        // เล่นเสียงผ่าน AudioManager หลัก (Singleton) ก่อน — ถ้าไม่มีค่อย fallback ไป local
+        // [BUGFIX] เดิมเล่นทั้ง 2 ที่ → เสียงซ้อน 2 ครั้ง
+        if (AudioManager.Instance != null)
+        {
+            if (isCorrect) AudioManager.Instance.PlayCorrectAnswer();
+            else           AudioManager.Instance.PlayWrongAnswer();
+        }
+        else if (audioSource != null)
         {
             audioSource.PlayOneShot(isCorrect ? correctSfx : wrongSfx);
         }

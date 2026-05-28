@@ -463,10 +463,9 @@ public class QuizManager : MonoBehaviour
             timeTaken = timeTaken
         });
 
-        if (audioSource != null)
-        {
-            audioSource.PlayOneShot(isCorrect ? correctSfx : wrongSfx);
-        }
+        // [BUGFIX] เดิมเล่นเสียง correct/wrong ทั้งที่ Submit (ที่นี่) และที่ ProcessQuizResults (ShowResults)
+        // → ในโหมด offline ที่ 2 บรรทัดนี้ห่างกันแค่ ~100ms ผู้เล่นได้ยินเป็นเสียงซ้อน
+        // ตอนนี้เหลือเล่นที่ ProcessQuizResults ตอนเดียว (ตรงกับจังหวะที่ Result Screen เด้ง)
 
         if (IsOnlineQuizMode())
         {
