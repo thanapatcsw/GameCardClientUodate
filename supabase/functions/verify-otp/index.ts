@@ -35,7 +35,12 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
     try {
-        const { email, code, password, username } = await req.json();
+        const body = await req.json();
+        // normalize email ให้ตรงกับ send-otp (lookup โดย .eq("email", ...) ต้องเป๊ะ)
+        const email = String(body.email ?? "").trim().toLowerCase();
+        const code = body.code;
+        const password = body.password;
+        const username = body.username;
 
         if (!email || !code || !password) {
             return json({ error: "ข้อมูลไม่ครบ" }, 400);

@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
     try {
-        const { email, username } = await req.json();
+        const body = await req.json();
+        // normalize email — กัน case-mismatch ระหว่าง send/verify (มือถือ auto-cap ตัวแรก ฯลฯ)
+        const email = String(body.email ?? "").trim().toLowerCase();
+        const username = body.username;
 
         // ── ตรวจ input ──
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
