@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: cf53e1eaf8b39d24b992b11b3c88936b
+guid: 207a81ebb7ffd90458e28f5a62a804ee
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4437484803614563777
-    second: Art_Noble_Infrastructure 1_0
+      213: 5759267135084964172
+    second: Art_Noble_Infrastructure_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -152,7 +152,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Art_Noble_Infrastructure 1_0
+      name: Art_Noble_Infrastructure_0
       rect:
         serializedVersion: 2
         x: 0
@@ -167,8 +167,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f322c58f413ea62c0800000000000000
-      internalID: -4437484803614563777
+      spriteID: c49225902f60def40800000000000000
+      internalID: 5759267135084964172
       vertices: []
       indices: 
       edges: []
@@ -187,7 +187,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Art_Noble_Infrastructure 1_0: -4437484803614563777
+      Art_Noble_Infrastructure_0: 5759267135084964172
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

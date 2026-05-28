@@ -67,24 +67,10 @@ public class RankUI : MonoBehaviour
     private Image           _pcAvatarBg;
 
     // ════════════════════════════════════════════
-    // OnEnable: สร้าง UI ทั้งในโหมด Edit และ Play (ด้วย [ExecuteAlways])
-    // → ทำให้ Scene/Game view โชว์ Leaderboard ก่อนกด Play
+    // OnEnable: เตรียม UI
     // ════════════════════════════════════════════
     private void OnEnable()
     {
-        // เคลียร์ children เดิม (ป้องกัน UI ซ้อนเมื่อ OnEnable ถูกเรียกหลายครั้ง เช่น compile script หรือเปิด scene)
-        // แก้ไขให้ลบเฉพาะชิ้นส่วน UI ที่โค้ดนี้สร้างขึ้น ("BG" และ "Card") 
-        // เพื่อป้องกันการลบ Object อื่นๆ ที่ผู้ใช้ลากไปวางเอง เช่น Sparkles Effect
-        for (int i = transform.childCount - 1; i >= 0; i--)
-        {
-            var child = transform.GetChild(i).gameObject;
-            if (child.name == "BG" || child.name == "Card")
-            {
-                if (Application.isPlaying) Destroy(child);
-                else DestroyImmediate(child);
-            }
-        }
-
         _isOverlay  = name == "LeaderboardOverlay";
         _myUsername = SupabaseManager.Instance != null
             ? SupabaseManager.Instance.GetCurrentUsername()
@@ -102,7 +88,19 @@ public class RankUI : MonoBehaviour
         }
 #endif
 
-        BuildUI();
+        // [FIX] เปลี่ยนระบบ: ถ้ามี UI "Card" อยู่แล้วใน Scene ให้ทำการ Link Reference เดิม
+        // จะได้ไม่ทำลาย UI ที่ผู้ใช้อุตส่าห์จัดวางหรือแก้สีไว้ใน Editor ตอนกด Play
+        Transform existingCard = transform.Find("Card");
+        if (existingCard != null)
+        {
+            LinkExistingUI(existingCard);
+        }
+        else
+        {
+            // ถ้ายังไม่มี UI เลย (เช่นเพิ่งลาก Script ลงใหม่) ให้สร้างใหม่
+            BuildUI();
+        }
+
         UpdateMyCard(null);
 
         // Editor preview: ซ่อน loading, โชว์ empty state เพื่อ preview สถานะ "ยังไม่มีข้อมูล"
@@ -111,6 +109,50 @@ public class RankUI : MonoBehaviour
             if (_loadingTmp != null) _loadingTmp.gameObject.SetActive(false);
             if (_scrollGo != null)   _scrollGo.SetActive(false);
             if (_emptyState != null) _emptyState.SetActive(true);
+        }
+    }
+
+    private void LinkExistingUI(Transform card)
+    {
+        _root = gameObject;
+        _emptyState = card.Find("EmptyState")?.gameObject;
+        _scrollGo = card.Find("ScrollArea")?.gameObject;
+        
+        if (_scrollGo != null) 
+            _rowHolder = _scrollGo.transform.Find("Content");
+            
+        _loadingTmp = card.Find("Loading")?.GetComponent<TextMeshProUGUI>();
+        
+        Transform pc = card.Find("PlayerCard");
+        if (pc != null) 
+        {
+            _pcName = pc.Find("Name")?.GetComponent<TextMeshProUGUI>();
+            _pcStatus = pc.Find("Status")?.GetComponent<TextMeshProUGUI>();
+            
+            _pcTierBg = pc.Find("TierPill")?.GetComponent<Image>();
+            if (_pcTierBg != null) 
+                _pcTier = _pcTierBg.transform.Find("TierLbl")?.GetComponent<TextMeshProUGUI>();
+                
+            _pcAvatarBg = pc.Find("AvatarBg")?.GetComponent<Image>();
+            if (_pcAvatarBg != null) 
+                _pcAvatar = _pcAvatarBg.transform.Find("AvatarLbl")?.GetComponent<TextMeshProUGUI>();
+                
+            _pcMmr = pc.Find("Stat_MMR")?.Find("Val")?.GetComponent<TextMeshProUGUI>();
+            _pcWL = pc.Find("Stat_W / L")?.Find("Val")?.GetComponent<TextMeshProUGUI>();
+            _pcWinPct = pc.Find("Stat_Win%")?.Find("Val")?.GetComponent<TextMeshProUGUI>();
+        }
+
+        // Link Footer Back Button
+        Transform backBtn = card.Find("BackBtn");
+        if (backBtn != null && backButton == null)
+        {
+            backButton = backBtn.GetComponent<Button>();
+            backButton.onClick.RemoveAllListeners();
+            backButton.onClick.AddListener(() =>
+            {
+                if (_isOverlay) Destroy(gameObject);
+                else SceneManager.LoadScene(backSceneName);
+            });
         }
     }
 

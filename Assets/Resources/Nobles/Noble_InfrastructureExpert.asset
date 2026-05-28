@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NobleData
   nobleName: "\u0E1C\u0E39\u0E49\u0E40\u0E0A\u0E35\u0E48\u0E22\u0E27\u0E0A\u0E32\u0E0D\u0E42\u0E04\u0E23\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E1E\u0E37\u0E49\u0E19\u0E10\u0E32\u0E19
     (Infrastructure Expert)"
-  artwork: {fileID: -4437484803614563777, guid: cf53e1eaf8b39d24b992b11b3c88936b, type: 3}
+  artwork: {fileID: 5759267135084964172, guid: 207a81ebb7ffd90458e28f5a62a804ee, type: 3}
   victoryPoints: 3
   requiredBonuses: 0300000000000000000000000300000003000000
