@@ -2,7 +2,7 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Singleton จัดการสกุลเงิน Gem และ Coin
+/// Singleton จัดการสกุลเงิน Gem (เพชร)
 /// DontDestroyOnLoad — อยู่ทุก Scene
 /// </summary>
 public class CurrencyManager : MonoBehaviour

@@ -14,9 +14,6 @@ public class PlayerProfile : BaseModel
     [Column("gems")]
     public int Gems { get; set; }
 
-    [Column("coins")]
-    public int Coins { get; set; }
-
     [Column("mmr")]
     public int Mmr { get; set; }
 
