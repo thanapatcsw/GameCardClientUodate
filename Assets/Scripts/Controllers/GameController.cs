@@ -3,7 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro; 
 
-public class GameController : MonoBehaviour
+// [Refactor] ใช้ partial class แยกความรับผิดชอบของ GameController เป็นหลายไฟล์
+//   - GameController.cs        : core (fields, lifecycle, state)
+//   - GameController.Bots.cs   : bot AI execution
+//   - GameController.Network.cs: online/Fusion sync (TODO)
+//   - GameController.Cards.cs  : card/bank/board interaction (TODO)
+public partial class GameController : MonoBehaviour
 {
     private const string MatchmakingRoomCodePrefsKey = "MatchmakingRoomCode";
     private const string MatchmakingTargetPlayerCountPrefsKey = "MatchmakingTargetPlayerCount";
@@ -23,7 +28,11 @@ public class GameController : MonoBehaviour
 
     [Header("---- Noble Database ----")]
     public List<NobleData> masterNobles; // ขุนนางทั้งหมด 8 ใบที่มี
-    public List<NobleDisplay> activeNobles = new List<NobleDisplay>(); // ขุนนาง 4 ใบที่โผล่มาในเกมนี้
+
+    // ระบบขุนนางถูกแยกออกไปเป็น NobleManager (helper class) — ดู Assets/Scripts/Controllers/NobleManager.cs
+    // GameController คงเก็บแค่ Inspector field (noblePrefab/left/rightContainer/masterNobles)
+    // แล้วส่งต่อให้ NobleManager ตอน StartInitialGameplay
+    private NobleManager nobleManager;
 
     [Header("---- Card Database (โหลดอัตโนมัติจาก JSON) ----")]
     [HideInInspector] public List<CardData> tier3Cards;
@@ -154,10 +163,11 @@ public class GameController : MonoBehaviour
         else
             Debug.LogWarning("[GameController] cardPrefab ยังไม่ได้ผูก → ข้ามการสร้างการ์ดบน Board");
 
-        // Setup ขุนนาง
+        // Setup ขุนนาง (delegate ไป NobleManager)
         if (noblePrefab != null && masterNobles != null && masterNobles.Count > 0)
         {
-            SetupNobles();
+            nobleManager = new NobleManager(noblePrefab, leftNobleContainer, rightNobleContainer, masterNobles);
+            nobleManager.Setup();
         }
         else
         {
@@ -269,159 +279,11 @@ public class GameController : MonoBehaviour
         }
     }
 
-    // host: late-joiner ขอ full state มา → ส่ง board/economy/turn ปัจจุบันกลับเฉพาะคนที่ขอ
-    private void HandleFullStateRequested(int requesterPlayerId)
-    {
-        if (!isOnlineMatchMode || FusionManager.Instance == null || !FusionManager.Instance.IsMasterClient)
-        {
-            return;
-        }
+    // Online callbacks (HandleFullStateRequested, IsMatchedOnlineSession, ShouldWaitForOnlineOpponent,
+    // HandleFusionActivePlayersChanged, HandleOnlineTurnStateReceived, HandleOnlineEconomyStateReceived)
+    // → moved to GameController.Network.cs
 
-        GameLog.Log($"[GameController] Host ได้รับคำขอ full state จาก player {requesterPlayerId} → ส่งกลับเฉพาะคนนั้น");
-        FusionManager.Instance.SendBoardStateToPlayer(requesterPlayerId, BuildBoardSnapshot());
-        FusionManager.Instance.SendEconomyStateToPlayer(requesterPlayerId, BuildEconomySnapshot());
-        FusionManager.Instance.SendTurnStateToPlayer(requesterPlayerId, currentPlayerIndex, currentRound, totalTurnCount, currentTurnDisplay);
-    }
-
-    private bool IsMatchedOnlineSession()
-    {
-        // [FIX] เช็คจาก GameMode ที่ตั้งมาจากหน้าเลือกโหมดโดยตรง
-        string gameMode = PlayerPrefs.GetString("GameMode", "Bot");
-        if (gameMode == "Online") return true;
-        if (gameMode == "Bot") return false;
-
-        // Fallback แบบเดิมเผื่อกรณีอื่นๆ
-        if (!string.IsNullOrWhiteSpace(PlayerPrefs.GetString(MatchmakingRoomCodePrefsKey, string.Empty)))
-        {
-            return true;
-        }
-
-        return FusionManager.Instance != null && FusionManager.Instance.ActivePlayerCount >= 2;
-    }
-
-    private bool ShouldWaitForOnlineOpponent()
-    {
-        return isOnlineMatchMode && FusionManager.Instance != null && FusionManager.Instance.ActivePlayerCount < GetConfiguredOnlinePlayerCount();
-    }
-
-    private void HandleFusionActivePlayersChanged()
-    {
-        isOnlineMatchMode = IsMatchedOnlineSession();
-        activePlayerCount = isOnlineMatchMode ? GetConfiguredOnlinePlayerCount() : 4;
-
-        if (!isOnlineMatchMode)
-        {
-            return;
-        }
-
-        SetupPlayers();
-        ConfigureBankCoinsByPlayerCount();
-        UpdateBankUI();
-        UpdateTurnVisuals();
-        ApplyNetworkPlayerNamesToUi();
-
-        if (ShouldWaitForOnlineOpponent())
-        {
-            ShowWarning("Waiting for opponent...");
-            return;
-        }
-
-        GameLog.Log("[GameController] Online players ready. Refreshing PvP setup.");
-
-        // Host re-broadcast กระดานปัจจุบันให้ผู้เล่นที่เพิ่งเข้ามา (late joiner) เห็นตรงกัน
-        if (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
-        {
-            PublishOnlineBoardState();
-        }
-
-        StartInitialGameplay();
-    }
-
-    private void HandleOnlineTurnStateReceived(int syncedCurrentPlayerIndex, int syncedRound, int syncedTotalTurnCount, int syncedTurnDisplay)
-    {
-        if (!isOnlineMatchMode)
-        {
-            return;
-        }
-
-        currentPlayerIndex = Mathf.Clamp(syncedCurrentPlayerIndex, 0, Mathf.Max(0, activePlayerCount - 1));
-        currentRound = Mathf.Max(1, syncedRound);
-        totalTurnCount = Mathf.Max(0, syncedTotalTurnCount);
-        currentTurnDisplay = Mathf.Max(1, syncedTurnDisplay);
-
-        ResetTimer();
-        UpdateTurnVisuals();
-        UpdateTurnCountUI();
-        System.Array.Clear(pendingCoins, 0, pendingCoins.Length);
-        foreach (var btn in bankButtons)
-        {
-            if (btn != null)
-            {
-                btn.UpdatePendingUI(0);
-            }
-        }
-        ClearWarning();
-    }
-
-    private void HandleOnlineEconomyStateReceived(FusionManager.EconomyStateSnapshot snapshot)
-    {
-        if (!isOnlineMatchMode)
-        {
-            return;
-        }
-
-        ApplyEconomySnapshot(snapshot);
-        EvaluateWinCondition();
-    }
-
-    void SetupNobles()
-    {
-        if (masterNobles.Count < 4) 
-        {
-            Debug.LogWarning("[GameController] มีขุนนางใน Master น้อยกว่า 4 ใบ! กรุณาใส่ให้ครบก่อน");
-            return;
-        }
-
-        activeNobles.Clear();
-
-        // ก็อปปี้ลิสต์ออกมาสับไพ่
-        List<NobleData> tempNobles = new List<NobleData>(masterNobles);
-        
-        // สลับไพ่ด้วย Fisher-Yates shuffle
-        for (int i = 0; i < tempNobles.Count; i++)
-        {
-            NobleData temp = tempNobles[i];
-            int randomIndex = Random.Range(i, tempNobles.Count);
-            tempNobles[i] = tempNobles[randomIndex];
-            tempNobles[randomIndex] = temp;
-        }
-
-        // ดึงมา 4 ใบ และสร้าง UI 
-        for (int i = 0; i < 4; i++)
-        {
-            NobleData selectedNoble = tempNobles[i];
-
-            // 2 ใบแรกไปทางซ้าย, 2 ใบหลังไปทางขวา
-            Transform targetContainer = (i < 2) ? leftNobleContainer : rightNobleContainer;
-
-            if (targetContainer == null) 
-            {
-                Debug.LogWarning("[GameController] ยังไม่ได้ผูก Left/Right Noble Container!");
-                continue;
-            }
-
-            GameObject nobleObj = Instantiate(noblePrefab, targetContainer);
-            NobleDisplay display = nobleObj.GetComponent<NobleDisplay>();
-
-            if (display != null)
-            {
-                display.SetupNoble(selectedNoble);
-                activeNobles.Add(display);
-            }
-        }
-
-        GameLog.Log($"[GameController] สร้างและสุ่มขุนนาง 4 ใบเรียบร้อย");
-    }
+    // SetupNobles → moved to NobleManager.Setup() (Assets/Scripts/Controllers/NobleManager.cs)
 
     void Update()
     {
@@ -946,7 +808,7 @@ public class GameController : MonoBehaviour
 
         // [Phase 1] เช็คขุนนางอัตโนมัติก่อนจบเทิร์นของคนปัจจุบัน
         PlayerUI p = players[playOrder[currentPlayerIndex]];
-        CheckNobles(p);
+        nobleManager?.CheckClaim(p);
 
         if (isOnlineMatchMode)
         {
@@ -1191,53 +1053,8 @@ public class GameController : MonoBehaviour
             if (players[i] != null) players[i].SetActiveTurn(i == activePlayerIdx);
     }
 
-    void EnsureBotController()
-    {
-        if (isOnlineMatchMode) return;
-        if (botController == null) botController = GetComponent<BotController>();
-        if (botController == null) botController = gameObject.AddComponent<BotController>();
-    }
+    // Bot AI execution methods → moved to GameController.Bots.cs
 
-    bool IsCurrentPlayerBot()
-    {
-        if (isOnlineMatchMode) return false;
-        if (players == null || players.Length == 0) return false;
-        if (playOrder == null || playOrder.Length == 0) return false;
-        if (currentPlayerIndex < 0 || currentPlayerIndex >= playOrder.Length) return false;
-
-        int activePlayerIdx = playOrder[currentPlayerIndex];
-        if (activePlayerIdx < 0 || activePlayerIdx >= players.Length) return false;
-
-        return players[activePlayerIdx] != null && players[activePlayerIdx].isBot;
-    }
-
-    void ScheduleBotTurnIfNeeded()
-    {
-        if (isOnlineMatchMode) return;
-        if (botTurnCoroutine != null) {
-            StopCoroutine(botTurnCoroutine);
-            botTurnCoroutine = null;
-        }
-
-        if (isGameOver || isWaitingForContinueAfterResult || !IsCurrentPlayerBot()) return;
-
-        botTurnCoroutine = StartCoroutine(RunBotTurnAfterDelay());
-    }
-
-    IEnumerator RunBotTurnAfterDelay()
-    {
-        float delay = Random.Range(botTurnDelayMin, botTurnDelayMax);
-        yield return new WaitForSeconds(delay);
-        botTurnCoroutine = null;
-
-        if (isGameOver || isWaitingForContinueAfterResult || !IsCurrentPlayerBot()) yield break;
-
-        EnsureBotController();
-        isExecutingBotTurn = true;
-        botController.ExecuteTurn(playOrder[currentPlayerIndex]);
-        isExecutingBotTurn = false;
-    }
-    
     public int GetResourceIndex(string type) {
         if (type == "CPU") return 0; if (type == "RAM") return 1; if (type == "Network") return 2;
         if (type == "Storage") return 3; if (type == "Security") return 4; return 5;
@@ -1848,42 +1665,8 @@ public class GameController : MonoBehaviour
         }
 
         // เช็คว่าโบนัสพอที่จะเชิญขุนนางลงมาหาได้หรือยัง
-        CheckNobles(p1);
+        nobleManager?.CheckClaim(p1);
     }
 
-    public void CheckNobles(PlayerUI player)
-    {
-        // ต้องเช็คย้อนกลับ เพราะถ้าขุนนางหลุดจากกระดานไปหาผู้เล่น เราจะลบออกจากลิสต์ activeNobles
-        for (int i = activeNobles.Count - 1; i >= 0; i--)
-        {
-            NobleDisplay nobleDisplay = activeNobles[i];
-            NobleData data = nobleDisplay.nobleData;
-
-            bool canClaim = true;
-            // เช็คว่า Player มีโบนัส >= เงื่อนไขของขุนนางหรือไม่
-            for (int b = 0; b < 5; b++)
-            {
-                if (player.bonuses[b] < data.requiredBonuses[b])
-                {
-                    canClaim = false;
-                    break;
-                }
-            }
-
-            if (canClaim)
-            {
-                string claimerName = player.nameText != null ? player.nameText.text : "ผู้เล่น";
-                GameLog.Log($"[Noble] {claimerName} ได้รับขุนนาง: {data.nobleName} (+{data.victoryPoints} VP)");
-                
-                // ให้คะแนน
-                player.AddScore(data.victoryPoints);
-
-                // แสดงบนการ์ดว่าถูกคนนี้เอาไปแล้ว (ให้อยู่กับที่ ไม่บินไปหา)
-                nobleDisplay.ClaimNoble(player.nameText != null ? player.nameText.text : "ผู้เล่น");
-
-                // ลบออกจากกระดาน (ในแง่ของระบบโค้ด จะได้ไม่เอามาเช็คซ้ำ)
-                activeNobles.RemoveAt(i);
-            }
-        }
-    }
+    // CheckNobles → moved to NobleManager.CheckClaim() (Assets/Scripts/Controllers/NobleManager.cs)
 }
