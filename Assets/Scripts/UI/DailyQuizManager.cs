@@ -69,6 +69,7 @@ public class DailyQuizManager : MonoBehaviour
     private bool isQuizActive;
     private bool hasAnswered;
     private int lastSecondTicked = -1;
+    private string _currentQuestionId; // เก็บ external_id ของคำถามที่กำลังแสดง เพื่อส่งให้ server บันทึก quiz history
 
     [Serializable]
     public class QuizQuestion
@@ -92,6 +93,46 @@ public class DailyQuizManager : MonoBehaviour
         AudioManager.Instance?.PlayGameBGM();
         InitializeUI();
         CheckDailyStatus();
+    }
+
+    // ───── ดึงคำถามที่ยังไม่เคยตอบจาก Supabase แล้ว fallback เป็น local random ─────
+    private async void LoadQuestionsAndStartAsync()
+    {
+        if (quizJson == null) quizJson = Resources.Load<TextAsset>("quiz_database");
+        if (quizJson != null)
+            quizDb = JsonUtility.FromJson<QuizDatabase>(quizJson.text);
+
+        if (quizDb == null || quizDb.questions == null || quizDb.questions.Length == 0)
+        {
+            Debug.LogError("[DailyQuiz] Question database is empty!");
+            return;
+        }
+
+        // ขั้น 1: ลองดึง external_id ของข้อที่ยังไม่เคยตอบจาก server
+        string unansweredId = await PlayerDataService.FetchUnansweredDailyQuestionIdAsync();
+
+        QuizQuestion picked = null;
+        if (!string.IsNullOrEmpty(unansweredId))
+        {
+            // หาคำถามใน local DB ที่ตรงกับ external_id ที่ server บอกว่ายังไม่ตอบ
+            foreach (var q in quizDb.questions)
+            {
+                if (q.id == unansweredId) { picked = q; break; }
+            }
+        }
+
+        // ขั้น 2: fallback → สุ่มจาก local DB ทั้งหมด (เช่น offline หรือตอบครบทุกข้อแล้ว)
+        if (picked == null)
+            picked = quizDb.questions[UnityEngine.Random.Range(0, quizDb.questions.Length)];
+
+        _currentQuestionId = picked.id; // จำ id ไว้ส่งตอนรับรางวัล
+        currentQuestion = picked;
+        DisplayQuestion(currentQuestion);
+        currentTime = timeLimit;
+        lastSecondTicked = Mathf.CeilToInt(timeLimit);
+        isQuizActive = true;
+        hasAnswered = false;
+        if (quizPanel != null) quizPanel.SetActive(true);
     }
 
     private void InitializeUI()
@@ -166,30 +207,8 @@ public class DailyQuizManager : MonoBehaviour
 
     private void LoadQuestionsAndStart()
     {
-        if (quizJson == null) quizJson = Resources.Load<TextAsset>("quiz_database");
-        
-        if (quizJson != null)
-        {
-            quizDb = JsonUtility.FromJson<QuizDatabase>(quizJson.text);
-        }
-
-        if (quizDb == null || quizDb.questions == null || quizDb.questions.Length == 0)
-        {
-            Debug.LogError("[DailyQuiz] Question database is empty!");
-            return;
-        }
-
-        // Pick random
-        currentQuestion = quizDb.questions[UnityEngine.Random.Range(0, quizDb.questions.Length)];
-        
-        // Setup UI
-        DisplayQuestion(currentQuestion);
-
-        currentTime = timeLimit;
-        lastSecondTicked = Mathf.CeilToInt(timeLimit);
-        isQuizActive = true;
-        hasAnswered = false;
-        if (quizPanel != null) quizPanel.SetActive(true);
+        // delegate ไปยัง async version ที่ดึงข้อที่ยังไม่เคยตอบจาก server
+        LoadQuestionsAndStartAsync();
     }
 
     private void DisplayQuestion(QuizQuestion question)
@@ -350,6 +369,7 @@ public class DailyQuizManager : MonoBehaviour
     private void StopTimerSound()
     {
         if (audioSource != null) audioSource.Stop();
+        AudioManager.Instance?.StopTimerTick();
     }
 
     private void MarkAsPlayed()
@@ -441,7 +461,8 @@ public class DailyQuizManager : MonoBehaviour
 
             // เขียน DB แบบ server-authoritative: server กำหนดจำนวน + กันรับซ้ำ/วัน
             // (ถ้า server ปฏิเสธ เช่นรับไปแล้ววันนี้ ค่าจะถูก reconcile ตอนโหลดโปรไฟล์ครั้งถัดไป)
-            _ = PlayerDataService.GrantQuizRewardAsync();
+            // ส่ง question_id ให้ server บันทึกลง quiz_history (daily_quiz_claims.question_id)
+            _ = PlayerDataService.GrantQuizRewardAsync(_currentQuestionId);
         }
         else
         {

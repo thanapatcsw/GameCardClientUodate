@@ -183,6 +183,10 @@ namespace StartupCity.Audio
         public void PlayCorrectAnswer() => PlaySFX(correctAnswerSFX);
         public void PlayWrongAnswer() => PlaySFX(wrongAnswerSFX);
         public void PlayTimerTick() => PlaySFX(quizTimerSFX);
+        public void StopTimerTick() 
+        {
+            if (sfxSource != null) sfxSource.Stop();
+        }
 
         // --- Recommended Functions ---
         public void PlayBuySuccess() => PlaySFX(buySuccessSFX);

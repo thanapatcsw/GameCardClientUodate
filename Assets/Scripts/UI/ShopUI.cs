@@ -18,6 +18,7 @@ public class ShopUI : MonoBehaviour
     public GameObject previewPanel;
     public Image previewFrameImage;
     public TextMeshProUGUI previewNameText;
+    public TMP_FontAsset previewNameFont; // เพิ่มตัวแปรสำหรับรับฟอนต์ ThaleahFat SDF
     public TextMeshProUGUI selectedItemNameText;
     public TextMeshProUGUI selectedItemPriceText;
     public Button actionButton;
@@ -50,6 +51,12 @@ public class ShopUI : MonoBehaviour
 
         if (previewPanel != null) previewPanel.SetActive(true);
         if (toastText != null) toastText.gameObject.SetActive(false);
+
+        // เปลี่ยนฟอนต์ตามที่ลากใส่ใน Inspector
+        if (previewNameFont != null && previewNameText != null)
+        {
+            previewNameText.font = previewNameFont;
+        }
 
         UpdateGemDisplay();
 

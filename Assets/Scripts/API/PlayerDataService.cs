@@ -129,7 +129,9 @@ public static class PlayerDataService
             {
                 try
                 {
-                    var result = await sb.From<PlayerProfile>().Select("*").Single();
+                    var result = await sb.From<PlayerProfile>()
+                        .Filter("id", Postgrest.Constants.Operator.Equals, sb.Auth.CurrentUser.Id)
+                        .Single();
                     if (result != null)
                     {
                         LocalProfile = result;
@@ -254,10 +256,15 @@ public static class PlayerDataService
         return (true, "");
     }
 
-    /// <summary>รับรางวัลควิซรายวัน — server กำหนดจำนวน + กันรับซ้ำ/วัน</summary>
-    public static async Task<bool> GrantQuizRewardAsync()
+    /// <summary>รับรางวัลควิซรายวัน — server กำหนดจำนวน + กันรับซ้ำ/วัน + บันทึก question_id เพื่อกันถามซ้ำ</summary>
+    public static async Task<bool> GrantQuizRewardAsync(string questionId = null)
     {
-        var (ok, status, body) = await CallAuthedFnAsync("grant-quiz-reward", "{}");
+        // ส่ง question_id ไปให้ server บันทึกใน daily_quiz_claims ด้วย
+        string payload = string.IsNullOrEmpty(questionId)
+            ? "{}"
+            : $"{{\"question_id\":\"{questionId}\"}}";
+
+        var (ok, status, body) = await CallAuthedFnAsync("grant-quiz-reward", payload);
         if (!ok)
         {
             Debug.LogWarning($"[PlayerData] quiz reward not granted ({status}): {body}");
@@ -270,6 +277,47 @@ public static class PlayerDataService
         CurrencyManager.Instance?.RefreshFromLocalCache();
         return true;
     }
+
+    /// <summary>ดึงคำถามที่ผู้เล่นยังไม่เคยตอบ (ผ่าน Supabase RPC get_unanswered_daily_questions)</summary>
+    public static async Task<string> FetchUnansweredDailyQuestionIdAsync()
+    {
+        var sb = SupabaseManager.Instance?.Client;
+        if (sb?.Auth?.CurrentUser == null) return null;
+
+        try
+        {
+            string userId = sb.Auth.CurrentUser.Id;
+            string url = $"{SupabaseConfig.Url}/rest/v1/rpc/get_unanswered_daily_questions";
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Headers.TryAddWithoutValidation("apikey", SupabaseConfig.AnonKey);
+            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {sb.Auth.CurrentSession.AccessToken}");
+            req.Content = new StringContent($"{{\"p_user_id\":\"{userId}\"}}", Encoding.UTF8, "application/json");
+
+            var resp = await _http.SendAsync(req);
+            string body = await resp.Content.ReadAsStringAsync();
+            if (!resp.IsSuccessStatusCode)
+            {
+                Debug.LogWarning($"[PlayerData] get_unanswered_daily_questions failed: {body}");
+                return null;
+            }
+
+            // parse array of 1 row → get external_id
+            var wrapper = JsonUtility.FromJson<UnansweredWrapper>("{\"rows\":" + body + "}");
+            if (wrapper?.rows != null && wrapper.rows.Length > 0)
+                return wrapper.rows[0].external_id;
+
+            // ถ้าตอบครบทุกข้อแล้ว คืน null → client จะ fallback ไปสุ่มตามปกติ
+            return null;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[PlayerData] FetchUnansweredDailyQuestion error: {e.Message}");
+            return null;
+        }
+    }
+
+    [System.Serializable] private class UnansweredRow { public string external_id; }
+    [System.Serializable] private class UnansweredWrapper { public UnansweredRow[] rows; }
 
     /// <summary>สวมกรอบ — server ตรวจ ownership ก่อนสวม</summary>
     public static async Task EquipFrameAsync(string itemId)

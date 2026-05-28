@@ -356,7 +356,10 @@ public class QuizManager : MonoBehaviour
         if (currentSecond != lastSecondTicked && currentSecond >= 0)
         {
             lastSecondTicked = currentSecond;
-            PlayTimerSound();
+            if (!isWaitingForOnlineResults) 
+            {
+                PlayTimerSound();
+            }
         }
 
         if (currentTime > 0f)
@@ -501,6 +504,7 @@ public class QuizManager : MonoBehaviour
     private void StopTimerSound()
     {
         if (audioSource != null) audioSource.Stop();
+        StartupCity.Audio.AudioManager.Instance?.StopTimerTick();
     }
 
     // [DEPRECATED] เก็บไว้กันพัง แต่ให้ใช้ SubmitAnswer แทน
@@ -703,11 +707,14 @@ public class QuizManager : MonoBehaviour
                 resultScreen.onClosed = gameController.OnResultScreenClosed;
             }
 
+            StartupCity.Audio.AudioManager.Instance?.StopTimerTick(); // หยุดเสียง tick จาก AudioManager ก่อนเริ่มแสดงผล
+
             // ส่งค่า iAmCorrect ไปที่ playFireworks เพื่อให้หน้าจอเปลี่ยนสี เขียว/แดง
             resultScreen.ShowResults(title, turnOrderNames, false, feedbackMsg, iAmCorrect);
             
             if (audioSource != null)
             {
+                audioSource.Stop(); // [BUGFIX] หยุดเสียงนับถอยหลังก่อนประกาศผล
                 if (iAmCorrect && correctSfx != null) audioSource.PlayOneShot(correctSfx);
                 else if (!iAmCorrect && wrongSfx != null) audioSource.PlayOneShot(wrongSfx);
             }

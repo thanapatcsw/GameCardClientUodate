@@ -44,36 +44,66 @@ public class BotController : MonoBehaviour
         string botName = botPlayer?.nameText != null ? botPlayer.nameText.text : $"Bot {playerIndex + 1}";
         GameLog.Log($"<color=orange>[Bot] เริ่มเทิร์นของบอท: {botName}</color>");
 
-        // --- Priority 1: Check Win Condition ---
-        CardDisplay winningCard = FindWinningCard(botPlayer);
-        if (winningCard != null)
+        bool actionTaken = false;
+        // [FIX] ครอบ try/finally รับประกันว่าถ้าเกิด Exception หรือทุก action ล้มเหลว
+        // เกมจะยัง EndTurn ให้เสมอ ไม่ค้างถาวร
+        try
         {
-            GameLog.Log($"<color=green>[Bot] พบโอกาสชนะ! ซื้อการ์ด ID: {winningCard.data.cardId}</color>");
-            PerformBuyAction(winningCard);
-            return;
-        }
+            // --- Priority 1: Check Win Condition ---
+            CardDisplay winningCard = FindWinningCard(botPlayer);
+            if (winningCard != null)
+            {
+                GameLog.Log($"<color=green>[Bot] พบโอกาสชนะ! ซื้อการ์ด ID: {winningCard.data.cardId}</color>");
+                PerformBuyAction(winningCard);
+                actionTaken = true;
+                return;
+            }
 
-        // --- Priority 2: Buy Best Affordable Card ---
-        CardDisplay bestCard = FindBestAffordableCard(botPlayer);
-        if (bestCard != null)
+            // --- Priority 2: Buy Best Affordable Card ---
+            CardDisplay bestCard = FindBestAffordableCard(botPlayer);
+            if (bestCard != null)
+            {
+                GameLog.Log($"<color=green>[Bot] ตัดสินใจซื้อการ์ดที่ดีที่สุด ID: {bestCard.data.cardId}</color>");
+                PerformBuyAction(bestCard);
+                actionTaken = true;
+                return;
+            }
+
+            // --- Priority 3: Reserve Important Tier 3 ---
+            // [FIX] เช็ค pendingReserveCard หลัง Prompt เพื่อยืนยันว่า action ไม่โดนบล็อก
+            CardDisplay reserveTarget = FindReserveTarget(botPlayer);
+            if (reserveTarget != null)
+            {
+                GameLog.Log($"<color=yellow>[Bot] ตัดสินใจจองการ์ด Tier 3 ID: {reserveTarget.data.cardId}</color>");
+                gameController.PromptReserveCard(reserveTarget);
+                // ถ้า PromptReserveCard ถูกบล็อก pendingReserveCard จะเป็น null → ไม่ ConfirmReserve
+                if (gameController.pendingReserveCard != null)
+                {
+                    gameController.ConfirmReserve(); // บอทกดยืนยันทันที
+                    actionTaken = true;
+                    return;
+                }
+                GameLog.Log("[Bot] Reserve ถูกบล็อก → ข้ามไป Priority 4");
+            }
+
+            // --- Priority 4: Collect Resources ---
+            CollectBestResources(botPlayer);
+            actionTaken = true;
+        }
+        catch (System.Exception ex)
         {
-            GameLog.Log($"<color=green>[Bot] ตัดสินใจซื้อการ์ดที่ดีที่สุด ID: {bestCard.data.cardId}</color>");
-            PerformBuyAction(bestCard);
-            return;
+            Debug.LogError($"[Bot] ExecuteTurn เกิด Exception: {ex.Message}\n{ex.StackTrace}");
         }
-
-        // --- Priority 3: Reserve Important Tier 3 ---
-        CardDisplay reserveTarget = FindReserveTarget(botPlayer);
-        if (reserveTarget != null)
+        finally
         {
-            GameLog.Log($"<color=yellow>[Bot] ตัดสินใจจองการ์ด Tier 3 ID: {reserveTarget.data.cardId}</color>");
-            gameController.PromptReserveCard(reserveTarget);
-            gameController.ConfirmReserve(); // บอทกดยืนยันทันที
-            return;
+            // [FIX] Safety net: ถ้าทุก action ล้มเหลวหรือเกิด Exception โดยไม่มี EndTurn
+            // ให้บังคับ EndTurn เพื่อไม่ให้เกมค้าง
+            if (!actionTaken)
+            {
+                GameLog.Log("[Bot] Safety net: ไม่มี action ใดสำเร็จ → บังคับ EndTurn");
+                gameController.EndTurn();
+            }
         }
-
-        // --- Priority 4: Collect Resources ---
-        CollectBestResources(botPlayer);
     }
 
     private CardDisplay FindWinningCard(PlayerUI player)
@@ -124,26 +154,35 @@ public class BotController : MonoBehaviour
         // [FIX] ใช้ cache แทน Find() ทุก call
         var colorMap = GetColorButtonMap();
 
-        // 1. ถ้ามีสีที่ขาดเยอะและกองกลางมี >= 4 -> หยิบ 2 อัน (ถ้าทำได้)
-        for (int i = 0; i < 5; i++)
+        // [FIX] คำนวณ capacity ที่เหลือก่อนตัดสินใจหยิบ 2 อัน
+        int currentTotalCoins = 0;
+        for (int ci = 0; ci < 6; ci++) currentTotalCoins += player.coins[ci];
+        int coinCapacityLeft = 10 - currentTotalCoins;
+
+        // 1. ถ้ามีสีที่ขาดเยอะและกองกลางมี >= 4 -> หยิบ 2 อัน (ถ้ามี capacity เพียงพอ)
+        if (coinCapacityLeft >= 2)
         {
-            int colorIdx = needs[i];
-            if (gameController.bankCoins[colorIdx] >= 4)
+            for (int i = 0; i < 5; i++)
             {
-                GameLog.Log($"<color=cyan>[Bot] หยิบเหรียญสี {colorIdx} จำนวน 2 อัน</color>");
-                if (colorMap.TryGetValue(colorIdx, out ResourceButton btn))
+                int colorIdx = needs[i];
+                if (gameController.bankCoins[colorIdx] >= 4)
                 {
-                    gameController.OnResourceClicked(btn);
-                    gameController.OnResourceClicked(btn);
+                    GameLog.Log($"<color=cyan>[Bot] หยิบเหรียญสี {colorIdx} จำนวน 2 อัน</color>");
+                    if (colorMap.TryGetValue(colorIdx, out ResourceButton btn))
+                    {
+                        gameController.OnResourceClicked(btn);
+                        gameController.OnResourceClicked(btn);
+                    }
+                    gameController.EndTurn();
+                    return;
                 }
-                gameController.EndTurn();
-                return;
             }
         }
 
-        // 2. ถ้าหยิบ 2 ไม่ได้ -> หยิบ 3 สีที่ต้องการที่สุด
+        // 2. ถ้าหยิบ 2 ไม่ได้ -> หยิบ 3 สีที่ต้องการที่สุด (ตามที่ capacity เหลือ)
+        int maxPick = Mathf.Min(3, coinCapacityLeft);
         int pickedCount = 0;
-        for (int i = 0; i < 5 && pickedCount < 3; i++)
+        for (int i = 0; i < 5 && pickedCount < maxPick; i++)
         {
             int colorIdx = needs[i];
             if (gameController.bankCoins[colorIdx] > 0 && colorMap.TryGetValue(colorIdx, out ResourceButton btn))

@@ -132,7 +132,7 @@ public class TutorialUI : MonoBehaviour
         if (nextBtn != null) nextBtn.interactable = true;
 
         if (nextBtnLbl != null)
-            nextBtnLbl.text = (index == slides.Length - 1) ? "เสร็จสิ้น" : "ถัดไป >";
+            nextBtnLbl.text = (index == slides.Length - 1) ? "Finish" : "Next";
     }
 
     public void NextSlide()
@@ -226,7 +226,7 @@ public class TutorialUI : MonoBehaviour
         nextBtn = nextGo.AddComponent<Button>();
         nextGo.AddComponent<Image>().color = new Color(0.1f, 0.35f, 0.55f, 0.9f);
         AddOutline(nextGo, new Color(0.2f, 0.75f, 1f, 0.65f));
-        nextBtnLbl = NewText("Lbl", nextGo.transform, Vector2.zero, Vector2.one, "ถัดไป >", 13, FontStyles.Normal, TextAlignmentOptions.Center);
+        nextBtnLbl = NewText("Lbl", nextGo.transform, Vector2.zero, Vector2.one, "Next", 13, FontStyles.Normal, TextAlignmentOptions.Center);
 
         EditorUtility.SetDirty(this);
         GameLog.Log("[TutorialUI] สร้างและเชื่อมต่อช่องภาพ Illustration (PNG) สำเร็จ!");

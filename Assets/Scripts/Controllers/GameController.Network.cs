@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 // ============================================================
@@ -64,27 +65,102 @@ public partial class GameController
             return;
         }
 
-        SetupPlayers();
-        ConfigureBankCoinsByPlayerCount();
-        UpdateBankUI();
-        UpdateTurnVisuals();
-        ApplyNetworkPlayerNamesToUi();
-
-        if (ShouldWaitForOnlineOpponent())
+        // [FIX] ถ้าเกมยังไม่เริ่ม ให้เรียก SetupPlayers() เหมือนเดิม
+        // ถ้าเกมเริ่มไปแล้ว → ไม่เรียก SetupPlayers() อีก (กัน Turn Order รีเซ็ตกลางเกม)
+        // สิ่งที่ทำแทน: แค่เช็คว่าคนไหนหลุด/เข้ามา และควบคุม isBot
+        if (!hasStartedInitialGameplay)
         {
-            ShowWarning("Waiting for opponent...");
-            return;
+            SetupPlayers();
+            ConfigureBankCoinsByPlayerCount();
+            UpdateBankUI();
+            UpdateTurnVisuals();
+            ApplyNetworkPlayerNamesToUi();
+
+            if (ShouldWaitForOnlineOpponent())
+            {
+                ShowWarning("Waiting for opponent...");
+                return;
+            }
+
+            GameLog.Log("[GameController] Online players ready. Starting PvP setup.");
+            if (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
+            {
+                PublishOnlineBoardState();
+            }
+            StartInitialGameplay();
+        }
+        else
+        {
+            // ——————————————————————————————————————————
+            // เกมเริ่มไปแล้ว — ไม่รีเซ็ต SetupPlayers()
+            // [FIX] เช็คว่ามี seat ไหนหลุดหายไป แล้วตั้งเป็น Bot สำหรับเกมเล่นต่อแทน
+            // ——————————————————————————————————————————
+            if (FusionManager.Instance != null)
+            {
+                UpdateDisconnectedPlayerBotStatus();
+            }
+
+            ApplyNetworkPlayerNamesToUi();
+            UpdateTurnVisuals();
+
+            if (ShouldWaitForOnlineOpponent())
+            {
+                ShowWarning("Waiting for opponent...");
+            }
+            else
+            {
+                ClearWarning();
+                // ถ้าเทิร์นปัจจุบันเป็นของ slot ที่เพิ่งกลายเป็น Bot ให้ schedule bot turn
+                ScheduleBotTurnIfNeeded();
+            }
+        }
+    }
+
+    // [FIX] เช็ค seat index ที่ Fusion ไม่มีตัวตนอยู่แล้ว และตั้ง isBot = true/false ตามสถานะการเชื่อมต่อ
+    private void UpdateDisconnectedPlayerBotStatus()
+    {
+        if (FusionManager.Instance == null || players == null) return;
+
+        var activePlayers = FusionManager.Instance.Runner?.ActivePlayers;
+        if (activePlayers == null) return;
+
+        // สร้างชุดของ seat index ที่ยังเชื่อมอยู่
+        var connectedSeats = new System.Collections.Generic.HashSet<int>();
+        int seatCount = activePlayerCount;
+        foreach (var player in activePlayers)
+        {
+            int seatIndex = FusionManager.Instance.GetLocalPlayerSeatIndex();
+            // Map PlayerId -> seat index โดยเรียงลำดับ (Ordered)
+            int orderedIdx = 0;
+            foreach (var op in FusionManager.Instance.Runner.ActivePlayers
+                         .OrderBy(p => p.PlayerId))
+            {
+                if (op == player) { connectedSeats.Add(orderedIdx); break; }
+                orderedIdx++;
+            }
         }
 
-        GameLog.Log("[GameController] Online players ready. Refreshing PvP setup.");
-
-        // Host re-broadcast กระดานปัจจุบันให้ผู้เล่นที่เพิ่งเข้ามา (late joiner) เห็นตรงกัน
-        if (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)
+        for (int seat = 0; seat < seatCount && seat < players.Length; seat++)
         {
-            PublishOnlineBoardState();
-        }
+            if (players[seat] == null) continue;
+            bool isConnected = connectedSeats.Contains(seat);
+            bool wasBot = players[seat].isBot;
 
-        StartInitialGameplay();
+            if (!isConnected && !wasBot)
+            {
+                // ออกไป — เปลี่ยนเป็น Bot ชั่วคราว
+                players[seat].isBot = true;
+                GameLog.Log($"[GameController] Seat {seat} หลุดเชื่อมต่อ → เปลี่ยนเป็น Bot ชั่วคราว");
+            }
+            else if (isConnected && wasBot && seat < seatCount)
+            {
+                // ต่อกลับมา — ถ้า seat นี้ในอดีตเคยเป็นคนจริง (ไม่ใช่ Bot ดั้งเดิม)
+                // เขาต่อกลับมา — reset isBot = false
+                players[seat].isBot = false;
+                GameLog.Log($"[GameController] Seat {seat} ต่อกลับมา → คืนตัวเป็นผู้เล่นจริง");
+                FusionManager.Instance.RequestFullState();
+            }
+        }
     }
 
     private void HandleOnlineTurnStateReceived(int syncedCurrentPlayerIndex, int syncedRound, int syncedTotalTurnCount, int syncedTurnDisplay)

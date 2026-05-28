@@ -69,7 +69,7 @@ public partial class GameController : MonoBehaviour
     public ResultScreenUI resultScreen; // หน้าต่างสรุปผลอเนกประสงค์
     [Header("---- Reserve Confirmation UI ----")]
     public GameObject confirmReservePanel; 
-    private CardDisplay pendingReserveCard; 
+    public CardDisplay pendingReserveCard;
 
     [Header("---- Bot Settings ----")]
     [SerializeField] private float botTurnDelayMin = 0.5f;
@@ -315,8 +315,11 @@ public partial class GameController : MonoBehaviour
             {
                 GameLog.Log($"[GameController] หมดเวลาในเทิร์นของผู้เล่น {playOrder[currentPlayerIndex] + 1}");
                 ShowWarning($"[ผู้เล่น {playOrder[currentPlayerIndex] + 1}] หมดเวลา! บังคับข้ามเทิร์น");
-                ClearPendingCoins(); 
-                EndTurn(); 
+                ClearPendingCoins();
+                // [FIX] ใช้ ForceEndTurn แทน EndTurn เพื่อให้ Host สามารถบังคับจบเทิร์นได้แม้เมื่อ:
+                // (1) เป็นเทิร์นของ Remote Player หรือ Bot ที่กำลังรอ Delay
+                // (2) ผู้เล่นหลุดกลางเทิร์น — ไม่โดนบล็อกจาก IsLocalPlayersTurn()
+                ForceEndTurn();
             }
         }
     }
@@ -497,6 +500,26 @@ public partial class GameController : MonoBehaviour
 
         // เช็คว่าโบนัสพอที่จะเชิญขุนนางลงมาหาได้หรือยัง
         nobleManager?.CheckClaim(p1);
+    }
+
+    // [NEW] ฟังก์ชันสำหรับใช้เทสเพิ่มคะแนนให้ Player 1 ทีละ 10 คะแนน
+    public void TestAddScoreToPlayer1()
+    {
+        if (players.Length == 0 || players[0] == null) return;
+
+        players[0].currentScore += 10;
+        if (players[0].scoreText != null) 
+        {
+            players[0].scoreText.text = players[0].currentScore.ToString();
+        }
+
+        GameLog.Log($"[Test] เพิ่มคะแนน 10 แต้มให้ Player 1. คะแนนรวม: {players[0].currentScore}");
+
+        // อัปเดต Economy ให้ Host/Client ตรงกันถ้าเป็นโหมดออนไลน์
+        if (isOnlineMatchMode)
+        {
+            PublishOnlineEconomyState();
+        }
     }
 
     // CheckNobles → moved to NobleManager.CheckClaim() (Assets/Scripts/Controllers/NobleManager.cs)

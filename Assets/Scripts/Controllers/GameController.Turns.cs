@@ -381,4 +381,76 @@ public partial class GameController
             turnCountText.text = "ROUND: " + currentRound;
         }
     }
+
+    // ───────── ForceEndTurn — Host-only, ไม่ตรวจ IsLocalPlayersTurn (bypass guards) ─────────
+    // ใช้เมื่อ: (1) หมดเวลาและเป็นเทิร์นของ Remote Player/Bot
+    //              (2) ผู้เล่นหลุดกลางเทิร์นและไม่มีตัวแทนในระบบ
+    public void ForceEndTurn()
+    {
+        if (isGameOver) return;
+        if (BlockActionDuringQuiz()) return;
+        if (BlockActionUntilContinue()) return;
+
+        GameLog.Log($"[GameController] ForceEndTurn: บังคับจบเทิร์น (bypass guards) สำหรับ Player slot {playOrder[currentPlayerIndex]}");
+
+        // ยกเลิกเหรียญค้างแล้ว Sync
+        if (GetTotalPendingCoins() > 0) {
+            System.Array.Clear(pendingCoins, 0, pendingCoins.Length);
+            foreach (var btn in bankButtons) if (btn != null) btn.UpdatePendingUI(0);
+        }
+
+        if (isOnlineMatchMode)
+        {
+            PublishOnlineBoardState();
+            PublishOnlineEconomyState();
+        }
+
+        UpdateBankUI();
+        ClearWarning();
+
+        // Noble check
+        if (playOrder != null && playOrder.Length > currentPlayerIndex)
+        {
+            PlayerUI p = players[playOrder[currentPlayerIndex]];
+            nobleManager?.CheckClaim(p);
+        }
+
+        // [REVERT] ตรวจสอบการชนะเกม "ทันที" ในทุกๆ เทิร์น!
+        EvaluateWinCondition();
+        if (isGameOver) return;
+
+        // เลื่อนตัวเลขเทิร์น
+        totalTurnCount++;
+        currentPlayerIndex++;
+
+        if (playOrder == null || playOrder.Length == 0) return;
+
+        bool isNewRound = false;
+        if (currentPlayerIndex >= playOrder.Length) {
+            currentPlayerIndex = 0;
+            currentRound++;
+            isNewRound = true;
+            GameLog.Log($"\n========== [Force] เริ่มรอบที่ {currentRound} ==========\n");
+        }
+
+        currentTurnDisplay = currentRound;
+        UpdateTurnCountUI();
+
+        bool shouldStartQuiz = isOnlineMatchMode
+            ? isNewRound && (currentTurnDisplay - 1) > 0 && (currentTurnDisplay - 1) % Mathf.Max(1, onlineQuizTurnInterval) == 0
+            : isNewRound && (currentTurnDisplay - 1) > 0 && (currentTurnDisplay - 1) % Mathf.Max(1, quizInterval) == 0;
+
+        if (shouldStartQuiz && QuizManager.Instance != null) {
+            bool canStartQuizLocally = !isOnlineMatchMode || (FusionManager.Instance != null && FusionManager.Instance.IsMasterClient);
+            if (canStartQuizLocally)
+                QuizManager.Instance.StartQuiz();
+            else if (FusionManager.Instance != null)
+                FusionManager.Instance.RequestQuizStart();
+        }
+
+        ResetTimer();
+        UpdateTurnVisuals();
+        PublishOnlineTurnState();
+        if (!shouldStartQuiz) ScheduleBotTurnIfNeeded();
+    }
 }

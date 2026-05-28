@@ -265,7 +265,18 @@ public partial class GameController
             return;
         }
 
+        // [FIX] Synchronized Seed: ทุกเครื่องใช้ seed เดียวกัน → สุ่มได้การ์ดใบเดียวกันเสมอ
+        // seed = จำนวนการ์ดที่ถูกใช้ไปแล้ว (usedCardIds.Count) คูณด้วย tier offset
+        // ค่านี้จะตรงกันทุกเครื่องเพราะ usedCardIds ถูก sync ผ่าน BoardState snapshot
+        int deterministicSeed = (usedCardIds.Count * 1000) + (tier * 97) + totalTurnCount;
+        Random.State originalState = Random.state;
+        Random.InitState(deterministicSeed);
+
         CardData selectedCard = availableCards[Random.Range(0, availableCards.Count)];
+
+        // คืนค่า Random state เดิมเพื่อไม่ให้กระทบการสุ่มอื่นๆ ในเกม
+        Random.state = originalState;
+
         usedCardIds.Add(selectedCard.cardId); // บันทึกว่าใบนี้ถูกใช้แล้ว
         GameObject newCardObj = Instantiate(cardPrefab, container);
         newCardObj.GetComponent<CardDisplay>()?.LoadCardData(selectedCard);
