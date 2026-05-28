@@ -3816,7 +3816,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 016b4a9a24b3ce849a6b2c0b16a075e6, type: 2}
   - {fileID: 11400000, guid: a5aa77c5a9285b042948fdc9eb86e470, type: 2}
   - {fileID: 11400000, guid: 9e9c70999d748934aab19b1330c0ec96, type: 2}
-  activeNobles: []
   tier3Cards:
   - {fileID: 11400000, guid: 5481fd626ad15dd4ab54876ca58de5df, type: 2}
   - {fileID: 11400000, guid: c4395203b6440504ca466d7c98c7c68a, type: 2}
@@ -11103,7 +11102,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6928863168604685247, guid: 762870e6bf7b8874fb8f0bb50fec0cad, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -234.27
+      value: -234.27002
       objectReference: {fileID: 0}
     - target: {fileID: 6928863168604685247, guid: 762870e6bf7b8874fb8f0bb50fec0cad, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
