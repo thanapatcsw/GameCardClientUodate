@@ -264,10 +264,11 @@ public class DailyQuizManager : MonoBehaviour
     public void SubmitDailyAnswer(int choiceIndex)
     {
         if (!isQuizActive || hasAnswered) return;
-        
+
         hasAnswered = true;
         isQuizActive = false;
-        
+        StopTimerSound(); // หยุดเสียงนับถอยหลังก่อนเล่นเสียง correct/wrong
+
         bool isCorrect = (choiceIndex == _shuffledCorrectIndex);
         
         // เล่นเสียงผ่าน AudioManager หลัก (Singleton) ก่อน — ถ้าไม่มีค่อย fallback ไป local
@@ -326,6 +327,7 @@ public class DailyQuizManager : MonoBehaviour
         if (hasAnswered) return;
         hasAnswered = true;
         isQuizActive = false;
+        StopTimerSound(); // หยุดเสียง tick ค้าง
         MarkAsPlayed();
         ShowResult(false, "หมดเวลาแล้ว!");
     }
@@ -334,12 +336,20 @@ public class DailyQuizManager : MonoBehaviour
     {
         if (audioSource != null && timerSfx != null)
         {
+            // [BUGFIX] หยุดเสียง tick เดิมก่อนเล่นใหม่ (timerSfx อาจยาวกว่า 1 วินาที → stack กันได้)
+            audioSource.Stop();
             audioSource.PlayOneShot(timerSfx);
         }
         else
         {
             AudioManager.Instance?.PlayTimerTick();
         }
+    }
+
+    /// <summary>หยุดเสียงนับถอยหลังทันที — เรียกตอนตอบเสร็จ/หมดเวลา เพื่อไม่ให้ tick ค้าง</summary>
+    private void StopTimerSound()
+    {
+        if (audioSource != null) audioSource.Stop();
     }
 
     private void MarkAsPlayed()

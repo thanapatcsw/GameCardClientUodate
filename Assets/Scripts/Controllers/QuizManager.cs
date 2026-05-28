@@ -452,6 +452,8 @@ public class QuizManager : MonoBehaviour
             return;
         }
 
+        StopTimerSound(); // หยุดเสียงนับถอยหลังทันทีตอนตอบ
+
         bool isCorrect = (choiceIndex == currentQuestion.correctChoiceIndex);
         float timeTaken = timeLimit - currentTime;
 
@@ -485,12 +487,20 @@ public class QuizManager : MonoBehaviour
     {
         if (audioSource != null && timerSfx != null)
         {
+            // [BUGFIX] หยุดเสียง tick เดิมก่อนเล่นใหม่ (timerSfx อาจยาวกว่า 1 วินาที → stack กันได้)
+            audioSource.Stop();
             audioSource.PlayOneShot(timerSfx);
         }
         else
         {
             StartupCity.Audio.AudioManager.Instance?.PlayTimerTick();
         }
+    }
+
+    /// <summary>หยุดเสียงนับถอยหลังทันที — เรียกตอนตอบเสร็จ/หมดเวลา</summary>
+    private void StopTimerSound()
+    {
+        if (audioSource != null) audioSource.Stop();
     }
 
     // [DEPRECATED] เก็บไว้กันพัง แต่ให้ใช้ SubmitAnswer แทน
@@ -532,6 +542,7 @@ public class QuizManager : MonoBehaviour
             return;
         }
 
+        StopTimerSound(); // กันเสียง tick ค้างหลังหมดเวลา
         isQuizActive = false;
         isWaitingForOnlineResults = false;
         if (gameController != null) gameController.SetGameplayInputLocked(false);
@@ -884,6 +895,7 @@ public class QuizManager : MonoBehaviour
             return;
         }
 
+        StopTimerSound(); // online client: หยุดเสียง tick เมื่อ host ส่งผลกลับมา
         isQuizActive = false;
         isWaitingForOnlineResults = false;
         if (gameController != null) gameController.SetGameplayInputLocked(false);
