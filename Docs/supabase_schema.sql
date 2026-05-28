@@ -1,3 +1,9 @@
+-- ============================================================================
+-- ขอบเขตไฟล์นี้: เฉพาะระบบจับคู่ผู้เล่น (rooms + matchmaking_queue + RPC)
+-- ภาพรวมตารางทั้งหมดของฐานข้อมูล (player_profiles, shop, quiz, otp ฯลฯ)
+-- ดูที่แหล่งความจริงเดียว: supabase/SCHEMA.sql
+-- ============================================================================
+
 create extension if not exists pgcrypto;
 
 create table if not exists public.rooms (
