@@ -413,12 +413,9 @@ public class DailyQuizManager : MonoBehaviour
             resultMessageText.color = Color.white;
             rewardText.text = $"รับรางวัลพิเศษ {gemReward} Gems";
             
-            // Trigger Effects
+            // Trigger Effects (เสียง correct/wrong ถูกเล่นไปแล้วใน SubmitDailyAnswer ผ่าน AudioManager
+            // อย่าเล่นซ้ำที่นี่ — เคยทำให้เสียงดัง 2 ครั้งทับกัน)
             if (confettiParticles != null) confettiParticles.Play();
-            if (sfxSource != null && correctSound != null) sfxSource.PlayOneShot(correctSound);
-
-            // เล่นเสียงถูกผ่าน AudioManager (ถ้ายังไม่ได้เล่นจาก SubmitDailyAnswer)
-            // AudioManager.Instance?.PlayCorrectAnswer();  // ← uncomment ถ้า ShowResult ถูกเรียกโดยตรง
 
             // อัปเดต local เพื่อโชว์ผลทันที (optimistic)
             if (CurrencyManager.Instance != null)
@@ -445,8 +442,7 @@ public class DailyQuizManager : MonoBehaviour
             resultMessageText.text = string.IsNullOrEmpty(customMsg) ? "คำตอบยังไม่ถูกต้อง พรุ่งนี้ลองใหม่นะ!" : customMsg;
             resultMessageText.color = new Color(1f, 0.8f, 0.8f); // สีขาวอมแดงจางๆ
             rewardText.text = "สู้ๆ นะ! ไว้ลองใหม่วันพรุ่งนี้";
-            
-            if (sfxSource != null && wrongSound != null) sfxSource.PlayOneShot(wrongSound);
+            // (เสียง wrong เล่นไปแล้วที่ SubmitDailyAnswer — ไม่เล่นซ้ำ)
         }
     }
 
