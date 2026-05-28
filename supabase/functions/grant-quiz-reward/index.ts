@@ -34,7 +34,9 @@ Deno.serve(async (req) => {
         if (!user) return json({ error: "ไม่ได้เข้าสู่ระบบ" }, 401);
 
         const db = createClient(SUPABASE_URL, SERVICE_ROLE);
-        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+        // ใช้เวลาไทย (UTC+7) เพื่อให้ "วันใหม่" ของ daily quiz รีเซ็ตเที่ยงคืนตามผู้เล่นจริง
+        // ถ้าใช้ UTC ตรงๆ จะรีเซ็ตตอน 7 โมงเช้าไทย — ผู้เล่นสับสน
+        const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10); // YYYY-MM-DD (Asia/Bangkok)
 
         // กันรับซ้ำ: insert claim ของวันนี้ ถ้าชนกัน = รับไปแล้ว
         const { error: claimErr } = await db
