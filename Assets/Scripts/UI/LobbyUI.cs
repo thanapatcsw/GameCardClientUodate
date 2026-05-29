@@ -38,14 +38,12 @@ public class LobbyUI : MonoBehaviour
     {
         AudioManager.Instance?.PlayButtonClick();
         string rName = roomNameInputField.text;
-        // ถ้าไม่กรอกรหัสห้อง ให้สุ่มเลข 4 หลัก และใส่กลับเข้าไปใน InputField ด้วย
         if (string.IsNullOrEmpty(rName)) 
         {
             rName = Random.Range(1000, 9999).ToString();
             roomNameInputField.text = rName;
         }
         
-        // [แก้ปัญหา 2 จังหวะ] เปิดหน้าจอและโชว์ปุ่มพื้นฐานทันที
         SetViewState(true);
         if (roomNameText != null) roomNameText.text = "Room Code : " + rName;
         
@@ -55,13 +53,13 @@ public class LobbyUI : MonoBehaviour
             statusWarningText.text = "Connecting to Photon Fusion...";
         }
         
-        // ซ่อนปุ่ม Start ไว้ก่อนจนกว่าคนจะครบ แต่ปุ่ม Leave ต้องกดได้เสมอ
         if (startButton != null) startButton.SetActive(false);
 
-        GameLog.Log($"[Lobby] กำลังสร้างห้อง: {rName}");
+        GameLog.Log($"[Lobby] กำลังสร้างห้องในโหมด Host: {rName}");
         if (FusionManager.Instance != null)
         {
-            FusionManager.Instance.StartMatchedGame(rName);
+            // [FIX-ANDROID] ใช้ Coroutine version (ไม่ใช้ async) เพื่อรับประกัน Main Thread
+            FusionManager.Instance.StartGameCoroutine(Fusion.GameMode.Host, rName);
         }
     }
 
@@ -76,9 +74,53 @@ public class LobbyUI : MonoBehaviour
             return;
         }
 
+        if (statusWarningText != null)
+        {
+            statusWarningText.gameObject.SetActive(true);
+            statusWarningText.text = "Joining room...";
+        }
+
         GameLog.Log($"[Lobby] กำลังเข้าร่วมห้อง: {rName}");
-        _ = FusionManager.Instance.StartGame(GameMode.Client, rName);
+        StartCoroutine(JoinRoomWithRetryCoroutine(rName));
     }
+
+    private System.Collections.IEnumerator JoinRoomWithRetryCoroutine(string rName)
+    {
+        const int maxRetries = 5;
+        const float retryDelay = 1.5f;
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            if (attempt > 0)
+            {
+                GameLog.Log($"[Lobby] Retry join attempt {attempt}/{maxRetries}...");
+                if (statusWarningText != null)
+                    statusWarningText.text = $"Retrying... ({attempt}/{maxRetries})";
+                yield return new UnityEngine.WaitForSeconds(retryDelay);
+            }
+
+            bool? result = null;
+
+            // [FIX-ANDROID] ใช้ Coroutine version + callback แทน ContinueWith
+            yield return FusionManager.Instance.StartGameCoroutine(Fusion.GameMode.Client, rName);
+
+            // ตรวจสอบว่า Runner เชื่อมต่อสำเร็จหรือไม่
+            if (FusionManager.Instance.Runner != null && FusionManager.Instance.Runner.IsRunning)
+            {
+                GameLog.Log($"[Lobby] Joined room {rName} successfully.");
+                SetViewState(true);
+                yield break;
+            }
+        }
+
+        // ถ้าเข้าไม่ได้หลังจากรีทรีทั้งหมด
+        if (statusWarningText != null)
+        {
+            statusWarningText.gameObject.SetActive(true);
+            statusWarningText.text = "Cannot join room. Please check the room code.";
+        }
+    }
+
 
     // --- ระบบสลับหน้าจอ (UI States) ---
 

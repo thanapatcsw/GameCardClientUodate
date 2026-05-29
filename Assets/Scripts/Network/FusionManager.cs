@@ -1,6 +1,7 @@
 using UnityEngine;
 using Fusion;
 using Fusion.Sockets;
+using System.Collections;
 using System.Collections.Generic;
 using System;
 using System.IO;
@@ -93,15 +94,53 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     public NetworkRunner Runner => _runner;
     public int ActivePlayerCount => _runner == null ? 0 : _runner.ActivePlayers.Count();
 
-    public void StartMatchedGame(string roomCode, string sceneName = null)
+    public void StartMatchedGame(string roomCode, string sceneName = null, Action<string> onFail = null)
     {
         // [FIX] ระบุว่าเป็นโหมดออนไลน์
         PlayerPrefs.SetString("GameMode", "Online");
         PlayerPrefs.Save();
 
-        // ถ้ามีการระบุชื่อฉากมา (เช่น จาก Auto-Match) ให้โหลดฉากนั้นทันที
-        // แต่ถ้าไม่มี (เช่น จากการสร้างห้องแมนนวล) ให้ส่ง null เพื่อรอในหน้า Lobby
-        _ = StartGame(GameMode.AutoHostOrClient, roomCode, sceneName);
+        // ถ้าไม่มี sceneName (Lobby manual) ให้ใช้ Host mode ตรงๆ เพื่อรอคนเข้าร่วม
+        if (string.IsNullOrEmpty(sceneName))
+        {
+            StartGameCoroutine(GameMode.Host, roomCode, null);
+            return;
+        }
+
+        // [FIX-ANDROID] Auto-Match ใช้ Coroutine retry — ทุก call อยู่บน Main Thread
+        StartCoroutine(StartMatchedGameCoroutine(roomCode, sceneName, onFail));
+    }
+
+    private IEnumerator StartMatchedGameCoroutine(string roomCode, string sceneName, Action<string> onFail)
+    {
+        const int maxRetries = 5;
+        const float retryDelaySeconds = 2.0f;
+        string lastFailReason = "Unknown";
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            if (attempt > 0)
+            {
+                GameLog.Log($"[Fusion] Auto-Match retry {attempt}/{maxRetries} for room {roomCode}");
+                yield return new WaitForSeconds(retryDelaySeconds);
+            }
+
+            // ใช้ StartGameCoroutine (ซึ่งจัดการทุกอย่างบน main thread)
+            bool? result = null;
+            yield return StartGameCoroutineInternal(GameMode.AutoHostOrClient, roomCode, sceneName, ok => result = ok, reason => lastFailReason = reason);
+
+            if (result == true)
+            {
+                GameLog.Log($"[Fusion] Auto-Match OK: room={roomCode}, isServer={_runner?.IsServer}");
+                yield break;
+            }
+
+            GameLog.Log($"[Fusion] Auto-Match attempt {attempt} failed. Will retry...");
+        }
+
+        string errorMsg = $"Failed to join room '{roomCode}' after {maxRetries} retries. Last Error: {lastFailReason}";
+        Debug.LogWarning($"[Fusion] Auto-Match: {errorMsg}");
+        onFail?.Invoke(errorMsg);
     }
 
     public void LoadGameScene()
@@ -112,13 +151,11 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             _runner.LoadScene(ResolveSceneRef(sceneToLoad), UnityEngine.SceneManagement.LoadSceneMode.Single);
 
             // snapshot ผู้เล่นที่อยู่จริงตอนเกมเริ่ม + อัปเดต status='playing' ในครั้งเดียว
-            // (ไม่ sync ทุก join/leave เพราะ DB เก็บไว้เป็นบันทึกแมตช์ ไม่ใช่สถานะ lobby realtime)
             SetRoomStatus("playing", _runner.ActivePlayers.Count());
         }
     }
 
     // host-only helper สำหรับอัปเดตสถานะห้องใน Supabase (waiting → playing → finished)
-    // ส่ง playerCount มาด้วยถ้าต้อง snapshot จำนวนผู้เล่นที่อยู่ขณะนั้น
     public void SetRoomStatus(string status, int? playerCount = null)
     {
         if (_runner == null || !_runner.IsServer) return;
@@ -129,14 +166,45 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         _ = PlayerDataService.CreateRoomAsync(roomCode, playerCount: playerCount, status: status);
     }
 
+    // ── Public entry: เรียกจาก LobbyUI / อื่นๆ ──
+    // ยังคง signature เดิม (async Task) ไว้ เพื่อไม่ให้โค้ดที่ fire-and-forget ด้วย _ = ... พัง
+    // แต่ภายในเปลี่ยนไปใช้ Coroutine เพื่อรับประกัน Main Thread safety บน Android
     public async Task StartGame(GameMode mode, string roomName, string sceneToLoad = null)
     {
         // [FIX] ระบุว่าเป็นโหมดออนไลน์เสมอเมื่อมีการเริ่ม Network
         PlayerPrefs.SetString("GameMode", "Online");
         PlayerPrefs.Save();
 
-        await ResetRunnerAsync();
+        // เรียก Coroutine ผ่าน helper ที่ block async จนกว่า coroutine จบ
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        StartCoroutine(StartGameCoroutineWithCallback(mode, roomName, sceneToLoad, tcs));
+        await tcs.Task;
+    }
 
+    // helper: เพื่อให้ async callers รอ coroutine ให้จบได้
+    private IEnumerator StartGameCoroutineWithCallback(GameMode mode, string roomName, string sceneToLoad, System.Threading.Tasks.TaskCompletionSource<bool> tcs)
+    {
+        yield return StartGameCoroutineInternal(mode, roomName, sceneToLoad, ok =>
+        {
+            tcs.TrySetResult(ok);
+        });
+    }
+
+    // ── Public entry: Coroutine version ──
+    public Coroutine StartGameCoroutine(GameMode mode, string roomName, string sceneToLoad = null)
+    {
+        return StartCoroutine(StartGameCoroutineInternal(mode, roomName, sceneToLoad, null));
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  Core: ทุก network join/create ผ่านที่นี่ — 100% Main Thread
+    // ──────────────────────────────────────────────────────────────────
+    private IEnumerator StartGameCoroutineInternal(GameMode mode, string roomName, string sceneToLoad, Action<bool> onComplete, Action<string> onFailReason = null)
+    {
+        // Reset runner ก่อน
+        yield return ResetRunnerCoroutine();
+
+        // สร้าง Runner ใหม่บน Main Thread
         _runner = gameObject.AddComponent<NetworkRunner>();
         _sceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>();
         _runner.AddCallbacks(this);
@@ -145,8 +213,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         _hasPendingQuizStart = false;
         _pendingQuizStartIndex = -1;
 
-        // ถ้าไม่ได้ระบุฉากมา ให้ใช้ฉากปัจจุบัน (สำหรับ Lobby แมนนวล)
-        // แต่ถ้าเป็นโหมด Auto-Match หรือมีการระบุฉากมา ให้ใช้ฉากนั้นเลย
+        // ระบุฉากปลายทาง
         SceneRef targetScene;
         if (!string.IsNullOrEmpty(sceneToLoad))
         {
@@ -157,7 +224,8 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             targetScene = SceneRef.FromIndex(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
         }
 
-        var result = await _runner.StartGame(new StartGameArgs()
+        // เรียก Fusion StartGame (async) แล้ว poll รอผลลัพธ์บน main thread
+        var fusionStartTask = _runner.StartGame(new StartGameArgs()
         {
             GameMode = mode,
             SessionName = roomName,
@@ -165,36 +233,78 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             SceneManager = _sceneManager
         });
 
-        if (result.Ok)
+        // poll ทุก frame จนกว่า task จะเสร็จ (max 25 วินาที)
+        float elapsed = 0f;
+        while (!fusionStartTask.IsCompleted && elapsed < 25f)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        bool taskOk = false;
+        string failReason = "";
+
+        if (!fusionStartTask.IsCompleted)
+        {
+            failReason = "StartGame timed out after 25s for room: " + roomName;
+            Debug.LogWarning($"[Fusion] {failReason}");
+            CleanupRunnerComponents();
+            onComplete?.Invoke(false);
+            onFailReason?.Invoke(failReason);
+            yield break;
+        }
+
+        if (fusionStartTask.IsFaulted)
+        {
+            failReason = fusionStartTask.Exception?.GetBaseException().Message ?? "Unknown Task Exception";
+        }
+        else if (fusionStartTask.IsCompletedSuccessfully && fusionStartTask.Result.Ok)
+        {
+            taskOk = true;
+        }
+        else if (fusionStartTask.IsCompletedSuccessfully)
+        {
+            failReason = fusionStartTask.Result.ShutdownReason.ToString();
+        }
+        else
+        {
+            failReason = "Task Canceled or Failed";
+        }
+
+        if (taskOk)
         {
             GameLog.Log($"[Fusion] Started session successfully: {roomName} (Mode: {mode})");
-            
+
             if (_runner != null && _runner.IsServer && SupabaseManager.Instance != null && SupabaseManager.Instance.IsInitialized)
             {
-                // server-authoritative: ผ่าน Edge Function (service_role) แทนการ insert ตรงจาก client ที่ติด RLS
                 _ = PlayerDataService.CreateRoomAsync(roomName, roomName, 1);
             }
 
-            // [ต่อปลั๊ก!] สั่งให้ LobbyUI แสดงหน้า RoomInfoView และโชว์รหัสห้อง
+            // Lobby UI update
             if (LobbyUI.Instance != null)
             {
-                LobbyUI.Instance.SetViewState(true); // เปิดหน้า RoomInfoView
+                LobbyUI.Instance.SetViewState(true);
                 if (LobbyUI.Instance.roomNameText != null)
                 {
                     LobbyUI.Instance.roomNameText.text = "Room Code : " + roomName;
                 }
             }
+
+            onComplete?.Invoke(true);
         }
         else
         {
-            Debug.LogError($"[Fusion] StartGame failed: {result.ShutdownReason}");
+            Debug.LogWarning($"[Fusion] StartGame failed: {failReason}");
             CleanupRunnerComponents();
+            onComplete?.Invoke(false);
+            onFailReason?.Invoke(failReason);
         }
     }
 
+
     public void Disconnect()
     {
-        _ = ResetRunnerAsync();
+        StartCoroutine(ResetRunnerCoroutine());
     }
 
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
@@ -544,17 +654,23 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         return -1;
     }
 
-    private async Task ResetRunnerAsync()
+    private IEnumerator ResetRunnerCoroutine()
     {
         if (_runner != null)
         {
-            try
+            var shutdownTask = _runner.Shutdown();
+            
+            // Poll for shutdown to complete
+            float elapsed = 0f;
+            while (!shutdownTask.IsCompleted && elapsed < 5f)
             {
-                await _runner.Shutdown();
+                elapsed += Time.deltaTime;
+                yield return null;
             }
-            catch (Exception shutdownException)
+
+            if (shutdownTask.IsFaulted)
             {
-                Debug.LogWarning($"[Fusion] Runner shutdown warning: {shutdownException.Message}");
+                Debug.LogWarning($"[Fusion] Runner shutdown warning: {shutdownTask.Exception?.GetBaseException().Message}");
             }
         }
 

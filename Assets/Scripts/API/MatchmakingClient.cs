@@ -349,7 +349,10 @@ public class MatchmakingClient : MonoBehaviour
 
                 if (FusionManager.Instance != null)
                 {
-                    FusionManager.Instance.StartMatchedGame(response.roomCode, gameSceneName);
+                    FusionManager.Instance.StartMatchedGame(response.roomCode, gameSceneName, errorMsg => 
+                    {
+                        SetErrorStatus(errorMsg);
+                    });
                     return;
                 }
 
@@ -423,10 +426,30 @@ public class MatchmakingClient : MonoBehaviour
     {
         if (statusText != null)
         {
-            statusText.text = message;
+            statusText.color = Color.white;
+            statusText.text = message.ToUpperInvariant();
         }
+    }
 
-        GameLog.Log($"[Matchmaking] UI Status => {message}");
+    private string TranslateErrorToEnglish(string errorMsg)
+    {
+        if (string.IsNullOrWhiteSpace(errorMsg)) return "UNKNOWN ERROR";
+
+        string lowerMsg = errorMsg.ToLowerInvariant();
+        if (errorMsg.Contains("ต้องเข้าสู่ระบบ")) return "MUST LOGIN TO MATCHMAKE";
+        if (errorMsg.Contains("อยู่ในคิว")) return "ALREADY IN QUEUE";
+        if (errorMsg.Contains("ไม่พบ")) return "NOT FOUND";
+        if (errorMsg.Contains("เกิดข้อผิดพลาด")) return "SYSTEM ERROR";
+
+        // Fallback: If it still contains any Thai character, return a generic english error
+        foreach (char c in errorMsg)
+        {
+            if (c >= 0x0E00 && c <= 0x0E7F)
+            {
+                return "MATCHMAKING FAILED";
+            }
+        }
+        return errorMsg;
     }
 
     private void SetErrorStatus(string errorMessage)
@@ -434,13 +457,13 @@ public class MatchmakingClient : MonoBehaviour
         ShowSearchPanel();
         SetCancelButtonInteractable(true);
 
-        if (string.IsNullOrWhiteSpace(errorMessage))
+        if (statusText != null)
         {
-            SetStatus("Error");
-            return;
+            statusText.color = Color.red;
+            string englishError = TranslateErrorToEnglish(errorMessage);
+            statusText.text = $"ERROR: {englishError}".ToUpperInvariant();
         }
-
-        SetStatus($"Error: {errorMessage}");
+        GameLog.Log($"[Matchmaking] Error: {errorMessage}");
     }
 
     private string GetOrCreatePlayerId()

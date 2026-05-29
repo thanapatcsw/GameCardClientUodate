@@ -34,11 +34,18 @@ public class AuthManagerUI : MonoBehaviour
     // ───── state ─────
     private bool _isProcessing = false;
     private Canvas _blockerCanvas;        // Canvas บน top เพื่อดัก input ทั้งหมด
+    // [FIX-ANDROID] capture main thread context ใน Awake เพื่อรับประกันว่า UI call
+    // จะ resume บน main thread เสมอ ไม่ว่า async continuation จะ resume บน thread ไหน
+    private System.Threading.SynchronizationContext _mainThreadContext;
 
     // ───── lifecycle ─────
 
     private void Awake()
     {
+        // [FIX-ANDROID] จับ Main Thread Context ตั้งแต่ตอน Awake (ซึ่งรับประกันว่าอยู่บน main thread)
+        // เพื่อใช้ post UI operations กลับมาจาก async continuation ที่อาจ resume บน background thread
+        _mainThreadContext = System.Threading.SynchronizationContext.Current;
+
         // ป้องกัน StatusText บัง Input
         if (statusText != null)
             statusText.raycastTarget = false;
@@ -88,7 +95,7 @@ public class AuthManagerUI : MonoBehaviour
         SetStatus("กำลังตรวจสอบ...", Color.yellow);
         SetBlocker(true);
 
-        _ = LoginAsync(email, pass);
+        StartCoroutine(LoginCoroutine(email, pass));
     }
 
     public void OnRegisterButtonClicked()
@@ -119,7 +126,7 @@ public class AuthManagerUI : MonoBehaviour
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = fallback,
-                    UseShellExecute = true   // ให้ OS เลือก app เปิดเอง (browser)
+                    UseShellExecute = true
                 });
             }
             catch (Exception ex) { Debug.LogError("[Auth] Process.Start error: " + ex.Message); }
@@ -130,69 +137,82 @@ public class AuthManagerUI : MonoBehaviour
         }
     }
 
-    // ───── login flow ─────
-
-    private async Task LoginAsync(string email, string password)
+    private System.Collections.IEnumerator LoginCoroutine(string email, string password)
     {
         bool goToScene = false;
 
-        try
+        if (SupabaseManager.Instance == null)
         {
-            if (SupabaseManager.Instance == null)
-            {
-                SetStatus("Error: SupabaseManager missing", Color.red);
-                return;
-            }
-
-            var loginTask   = SupabaseManager.Instance.SignInUser(email, password);
-            var timeoutTask = Task.Delay(15000);
-
-            if (await Task.WhenAny(loginTask, timeoutTask) == timeoutTask)
-            {
-                SetStatus("การเชื่อมต่อล่าช้า กรุณาลองใหม่", Color.red);
-                return;
-            }
-
-            var (ok, errMsg) = await loginTask;
-
-            if (ok)
-            {
-                SetStatus("สำเร็จ!", Color.green);
-                AudioManager.Instance?.PlayCorrectAnswer();
-                goToScene = true;
-            }
-            else
-            {
-                string reason = errMsg?.Contains("Invalid login credentials") == true
-                    ? "อีเมลหรือรหัสผ่านผิด"
-                    : errMsg;
-                SetStatus("ล็อกอินไม่สำเร็จ: " + reason, Color.red);
-                AudioManager.Instance?.PlayWarningText();
-            }
+            SetStatus("Error: SupabaseManager missing", Color.red);
+            UnlockUI();
+            yield break;
         }
-        catch (Exception ex)
+
+        // เริ่ม Task แบบ async
+        var loginTask = SupabaseManager.Instance.SignInUser(email, password);
+        
+        // รอจนกว่า Task จะเสร็จ หรือหมดเวลา (Timeout) ใน Coroutine (รับประกันว่าอยู่บน Main Thread)
+        float timeout = 15f;
+        float elapsed = 0f;
+        while (!loginTask.IsCompleted && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!loginTask.IsCompleted)
+        {
+            SetStatus("การเชื่อมต่อล่าช้า กรุณาลองใหม่", Color.red);
+            UnlockUI();
+            yield break;
+        }
+
+        if (loginTask.IsFaulted || loginTask.IsCanceled)
         {
             SetStatus("เกิดข้อผิดพลาด", Color.red);
-            Debug.LogError($"[Auth] Exception: {ex}");
+            Debug.LogError($"[Auth] Exception: {loginTask.Exception}");
+            UnlockUI();
+            yield break;
         }
-        finally
+
+        // ได้ผลลัพธ์แล้ว
+        var (ok, errMsg) = loginTask.Result;
+
+        if (ok)
         {
-            // finally รันได้ 100% ไม่ว่า return/exception จะเกิดที่ไหน
-            _isProcessing = false;
-            SetBlocker(false);
-
-            if (passwordInput != null)
-                passwordInput.text = "";
-
-            GameLog.Log("[Auth] >>> UI UNLOCKED <<<");
+            SetStatus("สำเร็จ!", Color.green);
+            AudioManager.Instance?.PlayCorrectAnswer();
+            goToScene = true;
         }
+        else
+        {
+            string reason = errMsg?.Contains("Invalid login credentials") == true
+                ? "อีเมลหรือรหัสผ่านผิด"
+                : errMsg;
+            SetStatus("ล็อกอินไม่สำเร็จ: " + reason, Color.red);
+            AudioManager.Instance?.PlayWarningText();
+        }
+
+        UnlockUI();
 
         if (goToScene)
         {
-            await Task.Delay(600);
-            SceneManager.LoadScene(nextSceneName);
+            yield return new WaitForSeconds(0.6f);
+            UnityEngine.SceneManagement.SceneManager.LoadScene(nextSceneName);
         }
     }
+
+    private void UnlockUI()
+    {
+        _isProcessing = false;
+        SetBlocker(false);
+
+        if (passwordInput != null)
+            passwordInput.text = "";
+
+        GameLog.Log("[Auth] >>> UI UNLOCKED <<<");
+    }
+
 
     // ───── blocker — ใช้ Canvas sortingOrder สูงสุดดัก input แทน ─────
     //
