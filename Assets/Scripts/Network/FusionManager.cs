@@ -94,7 +94,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     public NetworkRunner Runner => _runner;
     public int ActivePlayerCount => _runner == null ? 0 : _runner.ActivePlayers.Count();
 
-    public void StartMatchedGame(string roomCode, string sceneName = null, Action<string> onFail = null)
+    public void StartMatchedGame(string roomCode, string sceneName = null, Action<string> onFail = null, bool? isHost = null)
     {
         // [FIX] ระบุว่าเป็นโหมดออนไลน์
         PlayerPrefs.SetString("GameMode", "Online");
@@ -108,14 +108,31 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         // [FIX-ANDROID] Auto-Match ใช้ Coroutine retry — ทุก call อยู่บน Main Thread
-        StartCoroutine(StartMatchedGameCoroutine(roomCode, sceneName, onFail));
+        StartCoroutine(StartMatchedGameCoroutine(roomCode, sceneName, onFail, isHost));
     }
 
-    private IEnumerator StartMatchedGameCoroutine(string roomCode, string sceneName, Action<string> onFail)
+    private IEnumerator StartMatchedGameCoroutine(string roomCode, string sceneName, Action<string> onFail, bool? isHost)
     {
-        const int maxRetries = 5;
-        const float retryDelaySeconds = 2.0f;
+        const int maxRetries = 20;
+        const float retryDelaySeconds = 2.5f;
+        // [FIX] Client รอนานกว่า Host เพื่อให้ Host มีเวลาสร้างห้องเสร็จก่อน
+        // Host สร้างห้อง Photon บนเครื่อง APK ใช้เวลา 5-15 วิ ก่อนที่ Client จะมุดเข้าได้
+        const float clientInitialDelaySeconds = 8f;
         string lastFailReason = "Unknown";
+        
+        GameMode targetMode = GameMode.AutoHostOrClient;
+        if (isHost.HasValue)
+        {
+            targetMode = isHost.Value ? GameMode.Host : GameMode.Client;
+            GameLog.Log($"[Fusion] Deterministic Host Election: {targetMode}");
+        }
+
+        // [FIX KEY] ถ้าเป็น Client → รอให้ Host สร้างห้องเสร็จก่อน ก่อนจะพยายามเข้าครั้งแรก
+        if (targetMode == GameMode.Client)
+        {
+            GameLog.Log($"[Fusion] Client waiting {clientInitialDelaySeconds}s for Host to create room...");
+            yield return new WaitForSeconds(clientInitialDelaySeconds);
+        }
 
         for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
@@ -127,7 +144,7 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
             // ใช้ StartGameCoroutine (ซึ่งจัดการทุกอย่างบน main thread)
             bool? result = null;
-            yield return StartGameCoroutineInternal(GameMode.AutoHostOrClient, roomCode, sceneName, ok => result = ok, reason => lastFailReason = reason);
+            yield return StartGameCoroutineInternal(targetMode, roomCode, sceneName, ok => result = ok, reason => lastFailReason = reason);
 
             if (result == true)
             {
@@ -193,8 +210,21 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     // ── Public entry: Coroutine version ──
     public Coroutine StartGameCoroutine(GameMode mode, string roomName, string sceneToLoad = null)
     {
+        // [FIX] ตั้ง GameMode = Online เหมือนกับ StartGame() และ StartMatchedGame()
+        // ถ้าไม่ตั้งตรงนี้ → GameController.IsMatchedOnlineSession() จะคืนค่า false → เล่นกับ Bot แทน
+        PlayerPrefs.SetString("GameMode", "Online");
+        PlayerPrefs.Save();
         return StartCoroutine(StartGameCoroutineInternal(mode, roomName, sceneToLoad, null));
     }
+
+    // ── Public entry: Coroutine version พร้อม callback ผลลัพธ์ (ใช้ใน JoinRoomWithRetryCoroutine) ──
+    public Coroutine StartGameCoroutineWithResult(GameMode mode, string roomName, Action<bool> onComplete, string sceneToLoad = null)
+    {
+        PlayerPrefs.SetString("GameMode", "Online");
+        PlayerPrefs.Save();
+        return StartCoroutine(StartGameCoroutineInternal(mode, roomName, sceneToLoad, onComplete));
+    }
+
 
     // ──────────────────────────────────────────────────────────────────
     //  Core: ทุก network join/create ผ่านที่นี่ — 100% Main Thread
@@ -350,13 +380,25 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
         string list = "Players in Room:\n";
         foreach (var p in runner.ActivePlayers)
         {
-            list += "- Player " + p.PlayerId + (p == runner.LocalPlayer ? " (You)" : string.Empty) + "\n";
+            // [FIX] ดึงชื่อจริงจาก _playerNames dictionary แทน PlayerId ตัวเลข
+            string displayName;
+            if (_playerNames.TryGetValue(p.PlayerId, out string realName) && !string.IsNullOrWhiteSpace(realName))
+            {
+                displayName = realName;
+            }
+            else
+            {
+                displayName = "Player " + p.PlayerId; // fallback ถ้ายังไม่ได้รับชื่อ
+            }
+            bool isLocal = (p == runner.LocalPlayer);
+            list += "- " + displayName + (isLocal ? " (You)" : string.Empty) + "\n";
         }
 
         if (LobbyUI.Instance != null)
         {
             LobbyUI.Instance.UpdatePlayerList(list, runner.ActivePlayers.Count(), runner.IsServer);
         }
+
     }
 
     public void OnInput(NetworkRunner runner, NetworkInput input) { }
@@ -1055,6 +1097,11 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
     private void NotifyPlayerNamesUpdated()
     {
         PlayerNamesUpdated?.Invoke();
+        // [FIX] refresh lobby player list ทันทีที่ได้ชื่อใหม่ (ไม่รอให้มีคนเข้า/ออกก่อน)
+        if (_runner != null && _runner.IsRunning && LobbyUI.Instance != null)
+        {
+            RefreshPlayerList(_runner);
+        }
     }
 
     private void NotifyActivePlayersChanged()

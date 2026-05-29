@@ -157,4 +157,31 @@ public class SupabaseManager : MonoBehaviour
             PlayerPrefs.Save();
         }
     }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        // เมื่อกลับเข้ามาที่แอป (Resume) บน Android/iOS
+        if (!pauseStatus && IsInitialized && supabaseClient?.Auth != null)
+        {
+            _ = RehydrateSessionAsync();
+        }
+    }
+
+    private async Task RehydrateSessionAsync()
+    {
+        try
+        {
+            var session = supabaseClient.Auth.CurrentSession;
+            if (session == null || string.IsNullOrEmpty(session.AccessToken))
+            {
+                GameLog.Log("[Supabase] Re-hydrating session from PlayerPrefs...");
+                await supabaseClient.Auth.RetrieveSessionAsync();
+                GameLog.Log("[Supabase] Session re-hydrated successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[Supabase] Failed to re-hydrate session: {ex.Message}");
+        }
+    }
 }

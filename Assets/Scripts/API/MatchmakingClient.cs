@@ -1,7 +1,8 @@
-
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -349,10 +350,18 @@ public class MatchmakingClient : MonoBehaviour
 
                 if (FusionManager.Instance != null)
                 {
+                    bool? isHost = null;
+                    if (response.players != null && response.players.Length > 0)
+                    {
+                        var sortedPlayers = response.players.OrderBy(p => p).ToArray();
+                        isHost = (sortedPlayers[0] == _currentPlayerId);
+                        GameLog.Log($"[Matchmaking] Deterministic Host check: Player={_currentPlayerId}, Host={sortedPlayers[0]}, IsHost={isHost}");
+                    }
+
                     FusionManager.Instance.StartMatchedGame(response.roomCode, gameSceneName, errorMsg => 
                     {
                         SetErrorStatus(errorMsg);
-                    });
+                    }, isHost);
                     return;
                 }
 

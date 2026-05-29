@@ -86,8 +86,8 @@ public class LobbyUI : MonoBehaviour
 
     private System.Collections.IEnumerator JoinRoomWithRetryCoroutine(string rName)
     {
-        const int maxRetries = 5;
-        const float retryDelay = 1.5f;
+        const int maxRetries = 8;
+        const float retryDelay = 2.0f;
 
         for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
@@ -99,18 +99,35 @@ public class LobbyUI : MonoBehaviour
                 yield return new UnityEngine.WaitForSeconds(retryDelay);
             }
 
-            bool? result = null;
+            // ใช้ callback เพื่อรับผลลัพธ์ว่าเข้าห้องสำเร็จหรือไม่
+            bool? joinResult = null;
+            yield return FusionManager.Instance.StartGameCoroutineWithResult(
+                Fusion.GameMode.Client,
+                rName,
+                ok => joinResult = ok
+            );
 
-            // [FIX-ANDROID] ใช้ Coroutine version + callback แทน ContinueWith
-            yield return FusionManager.Instance.StartGameCoroutine(Fusion.GameMode.Client, rName);
+            // รอจนกว่าจะได้ผลลัพธ์
+            float waitTime = 0f;
+            while (joinResult == null && waitTime < 3f)
+            {
+                waitTime += UnityEngine.Time.deltaTime;
+                yield return null;
+            }
 
-            // ตรวจสอบว่า Runner เชื่อมต่อสำเร็จหรือไม่
-            if (FusionManager.Instance.Runner != null && FusionManager.Instance.Runner.IsRunning)
+            if (joinResult == true)
             {
                 GameLog.Log($"[Lobby] Joined room {rName} successfully.");
                 SetViewState(true);
+                if (statusWarningText != null)
+                {
+                    statusWarningText.gameObject.SetActive(true);
+                    statusWarningText.text = "Waiting for Host to start the game...";
+                }
                 yield break;
             }
+
+            GameLog.Log($"[Lobby] Join attempt {attempt} failed, will retry...");
         }
 
         // ถ้าเข้าไม่ได้หลังจากรีทรีทั้งหมด
@@ -120,7 +137,6 @@ public class LobbyUI : MonoBehaviour
             statusWarningText.text = "Cannot join room. Please check the room code.";
         }
     }
-
 
     // --- ระบบสลับหน้าจอ (UI States) ---
 

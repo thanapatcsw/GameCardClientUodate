@@ -4,4 +4,7 @@
   <assembly fullname="Fusion.Common" preserve="all"/>
   <assembly fullname="Fusion.Sockets" preserve="all"/>
   <assembly fullname="Assembly-CSharp" preserve="all"/>
+  <assembly fullname="System" preserve="all"/>
+  <assembly fullname="mscorlib" preserve="all"/>
+  <assembly fullname="UnityEngine.CoreModule" preserve="all"/>
 </linker>
