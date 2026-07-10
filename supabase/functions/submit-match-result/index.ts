@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
         const roomIdNum = Number.isInteger(roomId) ? roomId
             : (typeof roomId === "string" && /^\d+$/.test(roomId.trim()) ? parseInt(roomId.trim(), 10) : NaN);
 
-        let roomQuery = db.from("rooms").select("id, created_at");
+        let roomQuery = db.from("rooms").select("id, created_at, room_code");
         if (roomCodeStr.length > 0) roomQuery = roomQuery.eq("room_code", roomCodeStr);
         else if (Number.isInteger(roomIdNum)) roomQuery = roomQuery.eq("id", roomIdNum);
         else return json({ error: "ต้องเป็นแมตช์ออนไลน์ (ไม่พบรหัสห้อง)" }, 400);
@@ -81,6 +81,19 @@ Deno.serve(async (req) => {
         const { data: rooms } = await roomQuery.order("created_at", { ascending: false }).limit(1);
         const room = rooms?.[0];
         if (!room) return json({ error: "ไม่พบห้อง — รับรางวัลได้เฉพาะแมตช์ออนไลน์จริง" }, 400);
+
+        // ── กันฟาร์มรางวัล (แก้จริง): ต้องเป็น "สมาชิกห้องที่ระบบจับคู่ให้จริง" ──
+        // matchmaking_queue.player_id ถูกตั้ง = auth.uid() ฝั่ง server เสมอ (payload ถูกมองข้าม)
+        //   → client ปลอมไม่ได้. คน create-room เองแล้วยิงผล จะไม่มีแถวในคิว → ถูกปฏิเสธ
+        // ผลข้างเคียงที่ตั้งใจ: ห้องส่วนตัว (custom room ที่ไม่ผ่าน matchmaking) = unranked ไม่ได้ MMR/gems
+        // จับคู่ได้ทั้ง room_id (bigint) หรือ room_code (text) แล้วแต่คิวเก็บค่าไหนไว้ — robust ทั้งสองแบบ
+        const memberFilters = [`room_id.eq.${room.id}`];
+        if (room.room_code) memberFilters.push(`room_code.eq.${room.room_code}`);
+        const { data: queueRows } = await db.from("matchmaking_queue")
+            .select("id").eq("player_id", user.id).or(memberFilters.join(",")).limit(1);
+        if (!queueRows || queueRows.length === 0) {
+            return json({ error: "รับรางวัลได้เฉพาะแมตช์ที่ระบบจับคู่ให้ (ranked) เท่านั้น" }, 403);
+        }
 
         // ── server คำนวณค่าเอง ──
         const delta = mmrDelta(placement, totalPlayers);
@@ -106,21 +119,31 @@ Deno.serve(async (req) => {
             throw insErr;
         }
 
-        // ── ผ่านด่าน dedup แล้วค่อยเครดิต (อ่านค่าปัจจุบัน → บวก) ──
-        const { data: profile } = await db.from("player_profiles")
-            .select("mmr, gems, wins, losses").eq("id", user.id).maybeSingle();
-        const curMmr = profile?.mmr ?? 1000;
-        const newMmr = Math.max(0, curMmr + delta);
-        const newGems = (profile?.gems ?? 0) + reward;
+        // ── ผ่านด่าน dedup แล้วค่อยเครดิต (optimistic concurrency — กัน race read-modify-write) ──
+        //   guard ด้วยค่าเดิม (.eq mmr/gems) → ถ้ามีคำขออื่นแก้ค่าแทรกกลางคัน update จะไม่โดนแถว → อ่านใหม่แล้วลองใหม่
+        let newMmr = 1000, newGems = 0;
+        let credited = false;
+        for (let attempt = 0; attempt < 5 && !credited; attempt++) {
+            const { data: profile } = await db.from("player_profiles")
+                .select("mmr, gems, wins, losses").eq("id", user.id).maybeSingle();
+            const curMmr = profile?.mmr ?? 1000;
+            const curGems = profile?.gems ?? 0;
+            const curWins = profile?.wins ?? 0;
+            const curLosses = profile?.losses ?? 0;
+            newMmr = Math.max(0, curMmr + delta);
+            newGems = curGems + reward;
 
-        const { error: upErr } = await db.from("player_profiles").update({
-            mmr: newMmr,
-            wins: won ? (profile?.wins ?? 0) + 1 : (profile?.wins ?? 0),
-            losses: won ? (profile?.losses ?? 0) : (profile?.losses ?? 0) + 1,
-            gems: newGems,
-            updated_at: new Date().toISOString(),
-        }).eq("id", user.id);
-        if (upErr) throw upErr;
+            const { data: updated, error: upErr } = await db.from("player_profiles").update({
+                mmr: newMmr,
+                wins: won ? curWins + 1 : curWins,
+                losses: won ? curLosses : curLosses + 1,
+                gems: newGems,
+                updated_at: new Date().toISOString(),
+            }).eq("id", user.id).eq("mmr", curMmr).eq("gems", curGems).select("id");
+            if (upErr) throw upErr;
+            credited = (updated?.length ?? 0) > 0;
+        }
+        if (!credited) return json({ error: "ระบบไม่ว่าง กรุณาลองใหม่" }, 409);
 
         return json({ newMmr, mmrDelta: delta, gemReward: reward, gems: newGems, won });
     } catch (e) {

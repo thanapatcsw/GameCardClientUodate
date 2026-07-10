@@ -423,8 +423,16 @@ public partial class GameController : MonoBehaviour
                 players[activeIdx].UpdateTimerBar(currentTurnTime / turnDuration);
             }
             
-            if (currentTurnTime <= 0) 
+            if (currentTurnTime <= 0)
             {
+                // [Online] ให้ authority คนเดียวเป็นคนขับ timeout → กันทุกเครื่องแข่งกัน ForceEndTurn
+                //   พร้อมกันแล้วเทิร์นเลื่อนซ้อน (ข้าม 2 seat) หรือ noble/turn-count เพี้ยน.
+                //   non-authority แค่ค้าง timer ไว้ที่ 0 รอ turn-state broadcast ของ authority มา reset ให้เอง
+                if (isOnlineMatchMode && FusionManager.Instance != null && !FusionManager.Instance.IsMasterClient)
+                {
+                    currentTurnTime = 0f;
+                    return;
+                }
                 GameLog.Log($"[GameController] หมดเวลาในเทิร์นของผู้เล่น {playOrder[currentPlayerIndex] + 1}");
                 ShowWarning($"[ผู้เล่น {playOrder[currentPlayerIndex] + 1}] หมดเวลา! บังคับข้ามเทิร์น");
                 ClearPendingCoins();

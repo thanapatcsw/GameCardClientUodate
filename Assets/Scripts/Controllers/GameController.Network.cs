@@ -230,7 +230,6 @@ public partial class GameController
         // ข้าม snapshot ที่ version เก่ากว่าที่ apply ไปแล้ว (= ต้นเหตุ "หยิบเหรียญแล้วโดน revert")
         if (snapshot.Version < _lastAppliedEconVersion)
         {
-            GameLog.Log($"[NetDiag] APPLY-ECON SKIP stale ver={snapshot.Version} < applied={_lastAppliedEconVersion}");
             return;
         }
         _lastAppliedEconVersion = snapshot.Version;
@@ -438,8 +437,6 @@ public partial class GameController
         }
 
         var econSnap = BuildEconomySnapshot();
-        GameLog.Log($"[NetDiag] PUBLISH-ECON by master={FusionManager.Instance.IsMasterClient} " +
-            $"bank=[{(econSnap.BankCoins != null ? string.Join(",", econSnap.BankCoins) : "null")}]");
         FusionManager.Instance.SendEconomyState(econSnap);
     }
 
@@ -470,20 +467,6 @@ public partial class GameController
 
     private void ApplyEconomySnapshot(FusionManager.EconomyStateSnapshot snapshot)
     {
-        // [NetDiag] log "ก่อนเขียนทับ" — ถ้า in=[..] ต่างจาก cur=[..] แสดงว่า snapshot นี้กำลัง revert เหรียญที่เพิ่งหยิบ
-        if (snapshot.Players != null)
-        {
-            var diag = new System.Text.StringBuilder("[NetDiag] APPLY-ECON master=");
-            diag.Append(FusionManager.Instance != null && FusionManager.Instance.IsMasterClient);
-            diag.Append(" bankIn=[").Append(snapshot.BankCoins != null ? string.Join(",", snapshot.BankCoins) : "null").Append("]");
-            for (int i = 0; i < activePlayerCount && i < snapshot.Players.Length && i < players.Length; i++)
-            {
-                if (players[i] == null) continue;
-                diag.Append($" | p{i} cur=[{string.Join(",", players[i].coins)}] in=[{(snapshot.Players[i].Coins != null ? string.Join(",", snapshot.Players[i].Coins) : "null")}]");
-            }
-            GameLog.Log(diag.ToString());
-        }
-
         if (snapshot.BankCoins != null)
         {
             for (int i = 0; i < bankCoins.Length && i < snapshot.BankCoins.Length; i++)
@@ -599,7 +582,6 @@ public partial class GameController
         // ข้าม snapshot กระดานที่เก่ากว่าที่ apply แล้ว (กันการ์ดที่เพิ่งเปลี่ยนโดน revert)
         if (snapshot.Version < _lastAppliedBoardVersion)
         {
-            GameLog.Log($"[NetDiag] APPLY-BOARD SKIP stale ver={snapshot.Version} < applied={_lastAppliedBoardVersion}");
             return;
         }
         _lastAppliedBoardVersion = snapshot.Version;

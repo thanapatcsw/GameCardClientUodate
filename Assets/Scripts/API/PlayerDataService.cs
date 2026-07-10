@@ -358,8 +358,27 @@ public static class PlayerDataService
         }
     }
 
-    /// <summary>ดึงคำถามรายวัน (ผ่าน Supabase RPC get_daily_quiz_question)</summary>
-    public static async Task<string> FetchUnansweredDailyQuestionIdAsync()
+    // แถวคำถามรายวันจาก DB (RPC get_daily_quiz_question) — เนื้อคำถาม + เฉลยมาจาก server
+    [System.Serializable]
+    public class DailyQuizQuestionRow
+    {
+        public string external_id;
+        public string category;
+        public string difficulty;
+        public string question;
+        public string[] choices;
+        public int    correct_index;
+        public bool   already_answered;
+    }
+    [System.Serializable] private class DailyQuizQuestionWrapper { public DailyQuizQuestionRow[] rows; }
+
+    /// <summary>
+    /// ดึงคำถามประจำวันของผู้เล่น (เนื้อคำถาม + choices + เฉลย) จาก DB ผ่าน RPC get_daily_quiz_question
+    /// สำคัญ: RPC ตัวนี้ "INSERT แถว daily_quiz_claims ของวันนี้" ให้ด้วย — ถ้าไม่มีแถว claim นี้
+    /// submit_daily_quiz_answer จะตอบ 'ยังไม่ได้รับคำถามวันนี้' → ตอบถูกก็ถูกนับเป็นผิดทุกครั้ง
+    /// คืน null เมื่อออฟไลน์/ยังไม่ล็อกอิน/DB ว่าง → ให้ client fallback ไป JSON local
+    /// </summary>
+    public static async Task<DailyQuizQuestionRow> FetchDailyQuizQuestionAsync()
     {
         var sb = SupabaseManager.Instance?.Client;
         if (sb?.Auth?.CurrentUser == null) return null;
@@ -381,23 +400,20 @@ public static class PlayerDataService
                 return null;
             }
 
-            // parse array of 1 row → get external_id
-            var wrapper = JsonUtility.FromJson<UnansweredWrapper>("{\"rows\":" + body + "}");
+            // RPC คืน JSON array 1 แถว — wrap เพื่อให้ JsonUtility parse ได้ (choices jsonb → string[])
+            var wrapper = JsonUtility.FromJson<DailyQuizQuestionWrapper>("{\"rows\":" + body + "}");
             if (wrapper?.rows != null && wrapper.rows.Length > 0)
-                return wrapper.rows[0].external_id;
+                return wrapper.rows[0];
 
-            // ถ้าตอบครบทุกข้อแล้ว คืน null → client จะ fallback ไปสุ่มตามปกติ
+            // DB ว่าง/ไม่มี patch active → null → client fallback ไป JSON local
             return null;
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[PlayerData] FetchUnansweredDailyQuestion error: {e.Message}");
+            Debug.LogWarning($"[PlayerData] FetchDailyQuizQuestion error: {e.Message}");
             return null;
         }
     }
-
-    [System.Serializable] private class UnansweredRow { public string external_id; }
-    [System.Serializable] private class UnansweredWrapper { public UnansweredRow[] rows; }
 
     [System.Serializable]
     public class DailyQuizStatusRow {

@@ -25,6 +25,16 @@ const json = (body: unknown, status = 200) =>
         headers: { ...CORS, "Content-Type": "application/json" },
     });
 
+// escape ตัวอักษรพิเศษ HTML — กัน username (client ควบคุมได้) ฉีด HTML/ลิงก์ฟิชชิ่งลงอีเมล
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 // hash โค้ดด้วย SHA-256 ก่อนเก็บ (ไม่เก็บ plaintext)
 async function sha256(text: string): Promise<string> {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -41,7 +51,8 @@ Deno.serve(async (req) => {
         const body = await req.json();
         // normalize email — กัน case-mismatch ระหว่าง send/verify (มือถือ auto-cap ตัวแรก ฯลฯ)
         const email = String(body.email ?? "").trim().toLowerCase();
-        const username = body.username;
+        // sanitize username: จำกัดความยาว + escape HTML ก่อนเอาไปแสดงในอีเมล (กัน HTML injection)
+        const usernameSafe = escapeHtml(String(body.username ?? "").trim().slice(0, 40));
 
         // ── ตรวจ input ──
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -109,12 +120,12 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
                 sender: { email: FROM_EMAIL, name: "Startup City" },
-                to: [{ email, name: username ?? "" }],
+                to: [{ email, name: usernameSafe }],
                 subject: "รหัส OTP ยืนยันการสมัคร — Startup City",
                 htmlContent: `
                     <div style="font-family:sans-serif;max-width:420px;margin:auto">
                       <h2>ยืนยันการสมัครสมาชิก</h2>
-                      <p>สวัสดีคุณ ${username ?? ""} รหัส OTP ของคุณคือ</p>
+                      <p>สวัสดีคุณ ${usernameSafe} รหัส OTP ของคุณคือ</p>
                       <p style="font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p>
                       <p style="color:#666">รหัสนี้ใช้ได้ภายใน 5 นาที ห้ามบอกผู้อื่น</p>
                     </div>`,

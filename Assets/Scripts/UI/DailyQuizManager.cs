@@ -97,35 +97,41 @@ public class DailyQuizManager : MonoBehaviour
         ShowWarningPanel();
     }
 
-    // ───── ดึงคำถามที่ยังไม่เคยตอบจาก Supabase แล้ว fallback เป็น local random ─────
+    // ───── ดึงเนื้อคำถาม + เฉลยจาก DB (server-authoritative) แล้ว fallback เป็น JSON local ─────
     private async void LoadQuestionsAndStartAsync()
     {
-        if (quizJson == null) quizJson = Resources.Load<TextAsset>("quiz_database");
-        if (quizJson != null)
-            quizDb = JsonUtility.FromJson<QuizDatabase>(quizJson.text);
-
-        if (quizDb == null || quizDb.questions == null || quizDb.questions.Length == 0)
-        {
-            Debug.LogError("[DailyQuiz] Question database is empty!");
-            return;
-        }
-
-        // ขั้น 1: ลองดึง external_id ของข้อที่ยังไม่เคยตอบจาก server
-        string unansweredId = await PlayerDataService.FetchUnansweredDailyQuestionIdAsync();
-
         QuizQuestion picked = null;
-        if (!string.IsNullOrEmpty(unansweredId))
+
+        // ขั้น 1: ดึงคำถามเต็ม (เนื้อ + choices + เฉลย) จาก DB — RPC นี้ลงทะเบียน claim ให้ด้วย
+        var serverQ = await PlayerDataService.FetchDailyQuizQuestionAsync();
+        if (serverQ != null && serverQ.choices != null && serverQ.choices.Length >= 2)
         {
-            // หาคำถามใน local DB ที่ตรงกับ external_id ที่ server บอกว่ายังไม่ตอบ
-            foreach (var q in quizDb.questions)
+            picked = new QuizQuestion
             {
-                if (q.id == unansweredId) { picked = q; break; }
-            }
+                id           = serverQ.external_id,
+                category     = serverQ.category,
+                question     = serverQ.question,
+                choices      = serverQ.choices,
+                correctIndex = serverQ.correct_index
+            };
         }
 
-        // ขั้น 2: fallback → สุ่มจาก local DB ทั้งหมด (เช่น offline หรือตอบครบทุกข้อแล้ว)
+        // ขั้น 2: fallback → สุ่มจาก JSON local (ออฟไลน์ / DB ว่าง)
+        // หมายเหตุ: กรณีนี้ไม่มีแถว claim ฝั่ง server → submit จะถูกปฏิเสธ (ออฟไลน์อยู่แล้ว ส่งไม่ได้)
         if (picked == null)
+        {
+            if (quizJson == null) quizJson = Resources.Load<TextAsset>("quiz_database");
+            if (quizJson != null)
+                quizDb = JsonUtility.FromJson<QuizDatabase>(quizJson.text);
+
+            if (quizDb == null || quizDb.questions == null || quizDb.questions.Length == 0)
+            {
+                Debug.LogError("[DailyQuiz] Question database is empty (server + local JSON both unavailable)!");
+                return;
+            }
+
             picked = quizDb.questions[UnityEngine.Random.Range(0, quizDb.questions.Length)];
+        }
 
         _currentQuestionId = picked.id; // จำ id ไว้ส่งตอนรับรางวัล
         currentQuestion = picked;
@@ -135,6 +141,19 @@ public class DailyQuizManager : MonoBehaviour
         isQuizActive = true;
         hasAnswered = false;
         if (quizPanel != null) quizPanel.SetActive(true);
+        HideBackButtonsInQuizPanel(); // กันกดออกกลางคันขณะตอบคำถาม
+    }
+
+    /// <summary>ซ่อนปุ่ม BACK ที่อยู่ใน quizPanel ระหว่างตอบคำถาม (กดออกกลางคันไม่ได้)
+    /// — ปุ่ม back ของ resultPanel/warningPanel ไม่ถูกแตะ เพราะอยู่คนละ panel</summary>
+    private void HideBackButtonsInQuizPanel()
+    {
+        if (quizPanel == null || allBackToMenuButtons == null) return;
+        foreach (var btn in allBackToMenuButtons)
+        {
+            if (btn != null && btn.transform.IsChildOf(quizPanel.transform))
+                btn.gameObject.SetActive(false);
+        }
     }
 
     private void InitializeUI()

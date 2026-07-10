@@ -49,16 +49,23 @@ Deno.serve(async (req) => {
             throw claimErr;
         }
 
-        // อ่าน gems ปัจจุบันแล้วบวกรางวัล (server บวกเอง)
-        const { data: profile } = await db
-            .from("player_profiles").select("gems").eq("id", user.id).maybeSingle();
-        const newGems = (profile?.gems ?? 0) + QUIZ_REWARD;
-
-        const { error: upErr } = await db.from("player_profiles").update({
-            gems: newGems,
-            updated_at: new Date().toISOString(),
-        }).eq("id", user.id);
-        if (upErr) throw upErr;
+        // บวกรางวัลแบบ optimistic concurrency (กัน race read-modify-write กับคำขอ gem อื่นที่ยิงพร้อมกัน)
+        //   claim ถูก insert ไปแล้วด้านบน = ด่านกันรับซ้ำ/วัน; ตรงนี้แค่ทำให้ยอด gems ไม่หายเพราะโดนทับ
+        let newGems = QUIZ_REWARD;
+        let credited = false;
+        for (let attempt = 0; attempt < 5 && !credited; attempt++) {
+            const { data: profile } = await db
+                .from("player_profiles").select("gems").eq("id", user.id).maybeSingle();
+            const curGems = profile?.gems ?? 0;
+            newGems = curGems + QUIZ_REWARD;
+            const { data: updated, error: upErr } = await db.from("player_profiles").update({
+                gems: newGems,
+                updated_at: new Date().toISOString(),
+            }).eq("id", user.id).eq("gems", curGems).select("id");
+            if (upErr) throw upErr;
+            credited = (updated?.length ?? 0) > 0;
+        }
+        if (!credited) return json({ error: "ระบบไม่ว่าง กรุณาลองใหม่" }, 409);
 
         return json({ gems: newGems, reward: QUIZ_REWARD });
     } catch (e) {

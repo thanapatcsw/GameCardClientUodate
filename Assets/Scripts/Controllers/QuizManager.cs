@@ -251,6 +251,8 @@ public class QuizManager : MonoBehaviour
                 });
             }
 
+            SortQuestionDatabaseDeterministically(); // ให้ index ตรงกันทุกเครื่อง (online quiz-start by index)
+
             // บันทึก cache
             PlayerPrefs.SetString(CACHE_KEY,          json);
             PlayerPrefs.SetString(CACHE_KEY + "_ts",  System.DateTime.UtcNow.ToString("o"));
@@ -305,6 +307,7 @@ public class QuizManager : MonoBehaviour
             });
         }
 
+        SortQuestionDatabaseDeterministically(); // ให้ index ตรงกันทุกเครื่อง (online quiz-start by index)
         GameLog.Log($"<color=yellow>[Quiz] Loaded {questionDatabase.Count} questions from cache (offline).</color>");
         return questionDatabase.Count > 0;
     }
@@ -340,6 +343,7 @@ public class QuizManager : MonoBehaviour
             });
         }
 
+        SortQuestionDatabaseDeterministically(); // ให้ index ตรงกันทุกเครื่อง (online quiz-start by index)
         GameLog.Log($"<color=cyan>[Quiz] Loaded {questionDatabase.Count} questions from local JSON.</color>");
     }
 
@@ -465,6 +469,15 @@ public class QuizManager : MonoBehaviour
         }
 
         StartQuizInternal(GetNextQuestionIndex());
+    }
+
+    // [Online determinism] เรียงคลังคำถามด้วย id แบบคงที่ทุกเครื่อง
+    //   host ส่งควิซด้วย "index" ในคลัง (SendQuizStart) — ถ้าคลังเรียงต่างกันข้ามเครื่อง (RPC ไม่การันตี order,
+    //   หรือโหลดจาก cache/JSON คนละแหล่ง) index เดียวกันจะชี้คนละคำถาม → แต่ละคนเห็นคนละข้อ. sort นี้กันปัญหานั้น
+    private void SortQuestionDatabaseDeterministically()
+    {
+        if (questionDatabase == null) return;
+        questionDatabase.Sort((a, b) => string.CompareOrdinal(a != null ? a.id : null, b != null ? b.id : null));
     }
 
     private int GetNextQuestionIndex()

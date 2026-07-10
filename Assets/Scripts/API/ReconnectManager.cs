@@ -28,9 +28,6 @@ public class ReconnectManager : MonoBehaviour
     [SerializeField] private Button reconnectButton;
     [SerializeField] private TMP_Text statusText;
 
-    // เก็บ snapshot ไว้เผื่อกรณี "ห้องตายแล้ว" (ทุกคนออกหมด) → restore จาก DB เอง (ขั้นถัดไป)
-    public static string PendingBoardSnapshot;
-
     // true ระหว่างกำลัง reconnect (join กลางเกม) → ให้ GameController ข้ามการเริ่ม "ควิซรอบแรก"
     //   (อ่านครั้งเดียวด้วย ConsumeReconnectFlag แล้วเคลียร์เอง)
     private static bool _isReconnecting;
@@ -109,7 +106,6 @@ public class ReconnectManager : MonoBehaviour
     {
         if (_session == null || FusionManager.Instance == null) return;
 
-        PendingBoardSnapshot = _session.boardRaw;                         // เผื่อห้องตาย → restore เอง
         _isReconnecting = true;                                           // join กลางเกม → ข้ามควิซรอบแรก
         PlayerPrefs.SetString("MatchmakingRoomId", _session.roomCode);    // ให้ logic ในเกมรู้ room เดิม
         PlayerPrefs.Save();

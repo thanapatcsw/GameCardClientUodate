@@ -40,31 +40,41 @@ Deno.serve(async (req) => {
             .from("shop_items").select("price").eq("item_id", itemId).maybeSingle();
         if (!item) return json({ error: "ไม่พบไอเทมนี้" }, 404);
 
-        const { data: profile } = await db
-            .from("player_profiles").select("gems, owned_frames").eq("id", user.id).maybeSingle();
-        if (!profile) return json({ error: "ไม่พบโปรไฟล์ กรุณาเข้าเกมใหม่" }, 404);
+        // optimistic concurrency (กัน race read-modify-write บน gems):
+        //   guard update ด้วย gems ค่าเดิม → ถ้ามีคำขออื่นแก้ gems แทรกกลางคัน (เช่นกดซื้อ 2 ไอเทมพร้อมกัน)
+        //   update จะไม่โดนแถว → อ่านใหม่แล้วลองใหม่ (ป้องกัน "ได้ของ 2 จ่ายเงินอันเดียว")
+        let newGems = 0;
+        let newOwned: string[] = [];
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const { data: profile } = await db
+                .from("player_profiles").select("gems, owned_frames").eq("id", user.id).maybeSingle();
+            if (!profile) return json({ error: "ไม่พบโปรไฟล์ กรุณาเข้าเกมใหม่" }, 404);
 
-        const owned: string[] = profile.owned_frames ?? ["frame_default"];
-        if (owned.includes(itemId)) {
-            return json({ error: "มีไอเทมนี้อยู่แล้ว", gems: profile.gems, ownedFrames: owned }, 409);
+            const owned: string[] = profile.owned_frames ?? ["frame_default"];
+            if (owned.includes(itemId)) {
+                return json({ error: "มีไอเทมนี้อยู่แล้ว", gems: profile.gems, ownedFrames: owned }, 409);
+            }
+            const curGems = profile.gems ?? 0;
+            if (curGems < item.price) {
+                return json({ error: "Gems ไม่พอ" }, 402);
+            }
+
+            newGems = curGems - item.price;
+            newOwned = [...owned, itemId];
+            // สวมกรอบที่เพิ่งซื้อให้เลยในคำสั่งเดียว (เกม auto-equip หลังซื้ออยู่แล้ว)
+            const { data: updated, error: upErr } = await db.from("player_profiles").update({
+                gems: newGems,
+                owned_frames: newOwned,
+                equipped_frame: itemId,
+                updated_at: new Date().toISOString(),
+            }).eq("id", user.id).eq("gems", curGems).select("id");
+            if (upErr) throw upErr;
+            if ((updated?.length ?? 0) > 0) {
+                return json({ gems: newGems, ownedFrames: newOwned, equippedFrame: itemId });
+            }
+            // update ไม่โดนแถว = gems ถูกแก้ระหว่างทาง → วนอ่านใหม่
         }
-        if ((profile.gems ?? 0) < item.price) {
-            return json({ error: "Gems ไม่พอ" }, 402);
-        }
-
-        const newGems = profile.gems - item.price;
-        const newOwned = [...owned, itemId];
-        // สวมกรอบที่เพิ่งซื้อให้เลยในคำสั่งเดียว (เกม auto-equip หลังซื้ออยู่แล้ว)
-        // กัน race กับ equip-cosmetic ที่ client ยิงตามมา
-        const { error: upErr } = await db.from("player_profiles").update({
-            gems: newGems,
-            owned_frames: newOwned,
-            equipped_frame: itemId,
-            updated_at: new Date().toISOString(),
-        }).eq("id", user.id);
-        if (upErr) throw upErr;
-
-        return json({ gems: newGems, ownedFrames: newOwned, equippedFrame: itemId });
+        return json({ error: "ระบบไม่ว่าง กรุณาลองใหม่" }, 409);
     } catch (e) {
         console.error(e);
         return json({ error: "เกิดข้อผิดพลาดภายในระบบ" }, 500);

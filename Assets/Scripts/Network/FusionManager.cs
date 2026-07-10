@@ -612,8 +612,11 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
             }
         }
 
-        // เรียงตาม PlayerId เสมอ → seat เท่ากันทุกเครื่อง (ids เพิ่มขึ้นเรื่อยๆ → ของเดิมไม่สลับตำแหน่ง)
-        if (added)
+        // เรียงตาม PlayerId เฉพาะ "ก่อนมี uid binding ใดๆ" (ตอน seat ต้นแมตช์) → seat เท่ากันทุกเครื่อง
+        //   [Fix #6] เมื่อมี reclaim/bind แล้ว (_uidSeat ไม่ว่าง) ห้าม Sort ทั้งก้อน — จะสลับ seat ที่ reclaim ไว้
+        //   (reclaim วาง PlayerId ใหม่ไว้ seat เดิมซึ่งอาจไม่เรียง id) pid ใหม่ที่เพิ่งเข้ามาแค่ต่อท้าย
+        //   แล้ว HandleSeatBind + BroadcastSeatMap เป็นตัวจัด seat จริง (source of truth) ให้ตรงกันทุกเครื่อง
+        if (added && _uidSeat.Count == 0)
         {
             _seatOrder.Sort();
         }
@@ -820,12 +823,11 @@ public class FusionManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
     {
-        // [NetDiag] เพิ่ม context ไว้ไล่สาเหตุ disconnect (เทียบ timeline กับ TOOK/APPLY-ECON)
-        //   local = PlayerId ของเครื่องนี้ที่โดนเตะ; reason=ServerLogic + เตะเครื่องที่เพิ่ง rejoin → มักเพราะ "uid ซ้ำ"
-        //   (2 เครื่องล็อกอิน account เดียวกัน → ConnectionToken=uid ชนกัน → server เตะตัวเก่า/ตัวใหม่ทิ้ง)
+        // log สาเหตุ disconnect ไว้ไล่ปัญหา connection (ยิงครั้งเดียวตอนหลุด ไม่ใช่ spam)
+        //   reason=ServerLogic + เตะเครื่องที่เพิ่ง rejoin → มักเพราะ "uid ซ้ำ" (2 เครื่องล็อกอิน account เดียวกัน)
         bool wasMaster = runner != null && runner.IsRunning && runner.LocalPlayer == AuthorityPlayer;
         int localPid = runner != null ? runner.LocalPlayer.PlayerId : -1;
-        GameLog.Log($"[Fusion][NetDiag] Disconnected: reason={reason}, local=Player{localPid}, wasMaster={wasMaster}, players={ActivePlayerCount}, inProgress={IsGameInProgress}");
+        GameLog.Log($"[Fusion] Disconnected: reason={reason}, local=Player{localPid}, wasMaster={wasMaster}, players={ActivePlayerCount}, inProgress={IsGameInProgress}");
     }
 
     public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }

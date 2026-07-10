@@ -162,10 +162,13 @@ public class LobbyUI : MonoBehaviour
             }
 
             if (roomNameText != null) roomNameText.text = "Room Code : " + sessionName;
-            
-            // ตรวจสอบสถานะ MasterClient เบื้องต้น
-            if (startButton != null) 
-                startButton.SetActive(FusionManager.Instance != null && FusionManager.Instance.IsMasterClient);
+
+            // ตรวจสอบสถานะ MasterClient + ต้องมีผู้เล่นครบ 2 คนขึ้นไปถึงจะโชว์ปุ่มเริ่ม
+            // (กันเคสเพิ่งสร้างห้องมีคนเดียวแล้วเห็นปุ่ม Start ก่อน UpdatePlayerList จะรัน)
+            if (startButton != null)
+                startButton.SetActive(FusionManager.Instance != null
+                                      && FusionManager.Instance.IsMasterClient
+                                      && FusionManager.Instance.ActivePlayerCount >= 2);
         }
     }
 
@@ -213,23 +216,45 @@ public class LobbyUI : MonoBehaviour
         AudioManager.Instance?.PlayButtonClick();
         GameLog.Log("[Lobby] ออกจากห้องตัวเอง/การเชื่อมต่อ");
         FusionManager.Instance.Disconnect();
+        if (roomNameInputField != null) roomNameInputField.text = ""; // ครั้งหน้าได้เลขห้องใหม่
         SetViewState(false);
     }
 
     public void OnClickStartGame()
     {
         AudioManager.Instance?.PlayButtonClick();
-        GameLog.Log("[Lobby] สั่งเริ่มเกม!");
-        if (FusionManager.Instance != null)
+        if (FusionManager.Instance == null) return;
+
+        // ตาข่ายกันพลาด: ต้องมีผู้เล่นอย่างน้อย 2 คนถึงจะเริ่มได้ (เผื่อปุ่มถูกกดตอนจำนวนคนไม่พอ)
+        if (FusionManager.Instance.ActivePlayerCount < 2)
         {
-            FusionManager.Instance.LoadGameScene();
+            AudioManager.Instance?.PlayWarningText();
+            if (statusWarningText != null)
+            {
+                statusWarningText.gameObject.SetActive(true);
+                statusWarningText.text = "ห้องต้องการผู้เล่นอย่างน้อย 2 คนจึงจะเริ่มเกมได้";
+            }
+            GameLog.Log("[Lobby] ยังเริ่มเกมไม่ได้ — ผู้เล่นไม่ถึง 2 คน");
+            return;
         }
+
+        GameLog.Log("[Lobby] สั่งเริ่มเกม!");
+        FusionManager.Instance.LoadGameScene();
     }
 
-    // ปุ่มกลับ
+    // ปุ่มกลับ (จากหน้าห้อง/หน้ากรอกห้อง → หน้าเลือกโหมด)
     public void OnClickBack()
     {
         AudioManager.Instance?.PlayButtonClick();
+
+        // ปิดห้องที่สร้าง/เชื่อมต่อไว้ ไม่ให้ห้องเดิมค้างถูกใช้งานต่อ (กด BACK = ทิ้งห้อง)
+        // ปลอดภัยแม้ยังไม่ได้สร้างห้อง — Disconnect เป็น no-op เมื่อไม่มี runner
+        if (FusionManager.Instance != null) FusionManager.Instance.Disconnect();
+
+        // ล้างชื่อห้อง เพื่อให้กดสร้างรอบหน้าได้เลขห้องใหม่ (ไม่ใช้เลขเดิมซ้ำ)
+        if (roomNameInputField != null) roomNameInputField.text = "";
+
+        SetViewState(false); // reset หน้าห้องกลับไปหน้ากรอก เผื่อเข้ามาใหม่
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
         if (modeSelectPanel != null) modeSelectPanel.SetActive(true);
     }

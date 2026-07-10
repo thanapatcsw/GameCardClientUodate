@@ -205,12 +205,6 @@ public partial class GameController
             GameLogger.Log("take_coins", new GameLogger.Payload()
                 .Add("seat", coinSeat).Add("isBot", players[coinSeat] != null && players[coinSeat].isBot)
                 .Add("coins", takenCoins).Add("round", currentRound));
-
-            // [NetDiag] ดูว่าหยิบแล้วเหรียญเข้าจริงไหม + ใครเป็น master (ไล่กับ APPLY-ECON ฝั่งรับ)
-            GameLog.Log($"[NetDiag] TOOK seat={coinSeat} coins=[{string.Join(",", takenCoins)}] " +
-                $"-> myCoins=[{(players[coinSeat] != null ? string.Join(",", players[coinSeat].coins) : "null")}] " +
-                $"bank=[{string.Join(",", bankCoins)}] online={isOnlineMatchMode} " +
-                $"master={(FusionManager.Instance != null && FusionManager.Instance.IsMasterClient)} drive={useCoreDrive}");
         }
 
         UpdateBankUI();
